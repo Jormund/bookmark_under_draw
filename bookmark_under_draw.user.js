@@ -2,9 +2,9 @@
 // @id             iitc-plugin-bookmarkUnderDraw
 // @name           IITC plugin: Bookmark portals under draw.
 // @author         Jormund
-// @category       Info
-// @version        0.1.0.20160728.1133
-// @description    [2016-07-28-1133] Bookmark portals under draw.
+// @category       Controls
+// @version        0.1.0.20160728.1611
+// @description    [2016-07-28-1611] Bookmark portals under draw.
 // @include        https://www.ingress.com/intel*
 // @include        http://www.ingress.com/intel*
 // @match          https://www.ingress.com/intel*
@@ -21,8 +21,8 @@ function wrapper(plugin_info) {
 
     window.plugin.bookmarkUnderDraw.KEY_STORAGE_DRAW_TOOLS = 'plugin-draw-tools-layer';
 
-    //TODO: icône spécifique
-    window.plugin.bookmarkUnderDraw.ico = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAMAAAAoLQ9TAAAAA3NCSVQICAjb4U/gAAAACXBIWXMAAA3XAAAN1wFCKJt4AAAAGXRFWHRTb2Z0d2FyZQB3d3cuaW5rc2NhcGUub3Jnm+48GgAAAGxQTFRF////YGBgcHBwgICAa2treXl5hoaGZGRkgICAj4+Pra2ta2trdHR0e3t7Xl5eubm5bGxsenp6Xl5eZWVlbGxsc3Nzenp6gYGBiIiIj4+PlpaWl5eXnZ2dnp6epKSkpaWlq6urrKyss7Ozurq6UmiuoQAAABJ0Uk5TABAQEBMTE1RUVFRwcHDGxuTki1z6agAAAHZJREFUGNNlz8kOgkAURcFSUcAJkaZxaBz//x9dgNGEysvJ3T4mqvdPBa9/8Fhj/RwKN27cMTZJKUlS3+vh8j1c4VyiHAunf9AVC6uiK1B0EJf1rl5EMUYRWtt2qzVshPlhc8iCEIIATZ6Z5U2OvIH98Wc//d0HokUK52AarhEAAAAASUVORK5CYII=";
+    //star icon
+    window.plugin.bookmarkUnderDraw.ico = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIzMCIgaGVpZ2h0PSIzMCI+DQoJPGcgc3R5bGU9ImZpbGw6ICNGQUNBMDA7IGZpbGwtb3BhY2l0eTogMTsgc3Ryb2tlOiBub25lOyI+DQogICAgPHBhdGggZD0iTSAxNSwxIDE4LDEyIDI5LDEyIDIwLDE4IDI0LDI4IDE1LDIxIDYsMjggMTAsMTggMSwxMiAxMiwxMiBaIiAvPg0KCTwvZz4NCjwvc3ZnPg==";
 
     // STORAGE //////////////////////////////////////////////////////////
     window.plugin.bookmarkUnderDraw.loadStorage = function( key, store ) {
@@ -47,9 +47,11 @@ function wrapper(plugin_info) {
 
         var bookmarkUnderDraw = function() {
             var t = this;
-            //this.draw_datas = {};
             this._w_        = {};//work variables
             this.bookmarkedPortals = {};//bookmarks guids
+            //this.portalUnderDrawCount = 0;//unused
+            this.distinctPortalUnderDrawCount = 0;
+            this.bookmarkAddCount = 0;
             return t;
         };
         bookmarkUnderDraw.prototype.initialize = function(datas) {
@@ -59,7 +61,6 @@ function wrapper(plugin_info) {
                 draw_coords : { 'lat' : [], 'lng' : [] },
                 portalsUnderDraw     : []//guids of portals under draw
             };
-            //t. = datas;
         };
         bookmarkUnderDraw.prototype.run = function() {
             var t = this;
@@ -152,7 +153,7 @@ function wrapper(plugin_info) {
         };
         bookmarkUnderDraw.prototype.bookmarkPortals = function() {
             var t = this;
-
+            //t.portalUnderDrawCount += t._w_.portalsUnderDraw.length;//unused
             $.each(t._w_.portalsUnderDraw, function(index, guid) {
                 var portal = window.portals[guid];
                 var ll = portal.getLatLng();
@@ -164,8 +165,10 @@ function wrapper(plugin_info) {
                     }
                     else {
                         window.plugin.bookmarks.addPortalBookmark(guid, ll.lat+','+ll.lng, portalName);//actually bookmarks the portal
+                        t.bookmarkAddCount++;
                     }
                     t.bookmarkedPortals[guid] = {};//keep result for the count and the next checks
+                    t.distinctPortalUnderDrawCount++;
                 }
                 else {
                     //bookmark exists
@@ -176,50 +179,72 @@ function wrapper(plugin_info) {
         bookmarkUnderDraw.prototype.render = function() {
             var t = this;
 
-            var html = '<div class="bookmark-under-draw-box">';
-            var bookmarkedPortalCount = Object.keys(t.bookmarkedPortals).length;
-            if(bookmarkedPortalCount >0) {
-                if(bookmarkedPortalCount==1)
-                    html+= bookmarkedPortalCount + ' portal was bookmarked';
+            var message = '';
+            var bookmarkedPortalCount = t.bookmarkAddCount;// Object.keys(t.bookmarkedPortals).length;
+            var totalPortalCount = t.distinctPortalUnderDrawCount;
+            if(totalPortalCount >0) {
+                if(totalPortalCount==1)
+                    message+= totalPortalCount + ' portal found';
                 else
-                    html+= bookmarkedPortalCount + ' portals were bookmarked';
+                    message+= totalPortalCount + ' portals found';
             }
             else {
-                html += 'No portal was bookmarked';
+                message += 'No portal found';
             }
-            html += '</div>';
+            message+= ', '+ bookmarkedPortalCount + ' new';
+
+//            if(bookmarkedPortalCount >0) {
+//                if(bookmarkedPortalCount==1)
+//                    message+= ', '+ bookmarkedPortalCount + ' bookmarked';
+//                else
+//                    message+= ', '+bookmarkedPortalCount + ' bookmarked';
+//            }
+//            else {
+//                message += ', none bookmarked';
+//            }
+            var btn = window.plugin.bookmarkUnderDraw.button;
+            var messageBox = window.plugin.bookmarkUnderDraw.messageBox;
+            btn.classList.add("active");
+            setTimeout(function(){
+			    messageBox.textContent = message;
+		    }, 10);//setTimeout copied from layer-count, don't know why
 
             if ($('#loadlevel').html() != 'all') {
+                var html = '<div class="bookmark-under-draw-box">';
                 html += "<div style='margin:5px; padding-top:10px; color:red'>"
                 + "<strong>Your attention please ! </strong><br />"
                 + "<font style='color:white'>Zoom level is actually <span style='color:yellow;'><b>" + $('#loadlevel').html() + "</b></span>. "
                 + "Some portals might not be visible and cannot be bookmarked. Please adjust your zoom level and run Bookmarks Under Draw again.</font>"
                 + "</div>";
-            }
+                html += '</div>';
 
-            dialog({
-                width:'600px',
-                html: html,
-                id: 'plugin-bookmarkUnderDraw-box',
-                dialogClass: '',
-                title: 'Bookmarks Under Draw - results',
-            });
-            
-//            $('nav>a').click(function() {
-//                $('nav>a').removeClass('clicked');
-//                $(this).addClass('clicked');
-//                $('.tabs>section').attr('style', 'display:none');
-//                $('#'+$(this).attr('data-section')).attr('style', 'display:bloc');
-//            });
+                dialog({
+                    width:'600px',
+                    html: html,
+                    id: 'plugin-bookmarkUnderDraw-box',
+                    dialogClass: '',
+                    title: 'Bookmarks Under Draw - results',
+                });
+            }
         };
 
+        //doTheJob
         var ap = new bookmarkUnderDraw();
         ap.run();
     };
 
+    window.plugin.bookmarkUnderDraw.messageBoxClicked = function(evt) {
+        //console.log('window.plugin.bookmarkUnderDraw.messageBoxClicked');
+        var btn = window.plugin.bookmarkUnderDraw.button;
+        var messageBox = window.plugin.bookmarkUnderDraw.messageBox;
+        btn.classList.remove("active");
+        messageBox.textContent = "";
+        evt.stopPropagation();
+    }
+
     // init setup
     window.plugin.bookmarkUnderDraw.setup  = function() {
-        console.log('Bookmarks Under Draw loaded.');
+        console.log('Bookmarks Under Draw loading.');
         if (!window.plugin.bookmarks) {
             console.log('ERROR : Bookmarks plugin required');
             return false;
@@ -229,33 +254,45 @@ function wrapper(plugin_info) {
             return false;
         }
         window.plugin.bookmarkUnderDraw.addButtons();
+        console.log('Bookmarks Under Draw loaded.');
     };
 
     // toolbox menu
     window.plugin.bookmarkUnderDraw.addButtons = function() {
-        $('head').append('<style>.audtable { border-collapse:collapse; width: 100%; } .audtable > thead > tr > th, .audtable > tbody> tr > td{ border:1px solid #20A8B1;  font-size:12px; padding:3px; font-weight:normal; }</style>');
-        $('head').append('<style>.leaflet-control-bookmark-under-draw a{background-image:url(' + window.plugin.bookmarkUnderDraw.ico + ')!important; background-repeat:no-repeat;}</style>');
-//        $("head").append('<link rel="stylesheet" type="text/css" href="' + ppud_css_ui + '" />');        
-        //$('.leaflet-draw-toolbar-top').append('<a onclick="window.plugin.bookmarkUnderDraw.doTheJob();" class="leaflet-draw-draw-calculator" href="#" title="Show export under Draw" style="background-image:url(' + ppud_ico_ap + ')!important; background-repeat:no-repeat;"></a>');
-        var parent = $(".leaflet-top.leaflet-left", window.map.getContainer());
+        var css = '.leaflet-control-bookmark-under-draw-bookmark{background-image:url(' + window.plugin.bookmarkUnderDraw.ico + ')!important; background-repeat:no-repeat;}'
+            +'.leaflet-control-bookmark-under-draw-messageBox{background-color: rgba(255, 255, 255, 0.6); display: none; height: 24px; left: 30px; line-height: 24px; margin-left: 15px; margin-top: -12px; padding: 0 10px; position: absolute; top: 50%; white-space: nowrap; width: auto; }'
+            +'.leaflet-control-bookmark-under-draw a.active .leaflet-control-bookmark-under-draw-messageBox{ display: block;} '
+            +'.leaflet-control-bookmark-under-draw-messageBox:before { border-color: transparent rgba(255, 255, 255, 0.6); border-style: solid; border-width: 12px 12px 12px 0; content: ""; display: block; height: 0; left: -12px; position: absolute; width: 0; } ';
 
-	    var button = document.createElement("a");
-	    button.className = "leaflet-bar-part";//background-image:url(' + ppud_ico_ap + ')!important; background-repeat:no-repeat;
-	    button.addEventListener("click", window.plugin.bookmarkUnderDraw.doTheJob, false);
-	    button.title = 'Bookmark portals';
+        $('head').append('<style>'+css+'</style>');
 
-//	    var tooltip = document.createElement("div");
-//	    tooltip.className = "leaflet-control-bookmark-under-draw-tooltip";
-//	    button.appendChild(tooltip);
+        var leafletLeft = $(".leaflet-top.leaflet-left", window.map.getContainer());
 
 	    var container = document.createElement("div");
 	    container.className = "leaflet-control-bookmark-under-draw leaflet-bar leaflet-control";
-	    container.appendChild(button);
-	    parent.append(container);
+	    leafletLeft.append(container);
 
-	    plugin.layerCount.button = button;
-	    plugin.layerCount.tooltip = tooltip;
-	    plugin.layerCount.container = container;
+        var button = document.createElement("a");
+	    button.className = "leaflet-bar-part leaflet-control-bookmark-under-draw-bookmark";
+	    button.addEventListener("click", window.plugin.bookmarkUnderDraw.doTheJob, false);
+	    button.title = 'Bookmark portals';
+        container.appendChild(button);
+
+	    var messageBox = document.createElement("div");
+	    messageBox.className = "leaflet-control-bookmark-under-draw-messageBox";
+        messageBox.addEventListener("click", window.plugin.bookmarkUnderDraw.messageBoxClicked, false);
+	    button.appendChild(messageBox);
+
+//        var tooltipContainer = document.createElement("div");
+//	    tooltipContainer.className = "leaflet-control-bookmark-under-draw-messageBox";
+//        var messageBox = document.createElement("a");
+//        messageBox.addEventListener("click", window.plugin.bookmarkUnderDraw.messageBoxClicked, false);
+//	    button.appendChild(tooltipContainer);
+//        tooltipContainer.appendChild(messageBox);
+
+	    plugin.bookmarkUnderDraw.button = button;
+	    plugin.bookmarkUnderDraw.messageBox = messageBox;
+	    plugin.bookmarkUnderDraw.container = container;
     };
 
     // runrun
