@@ -1,0 +1,279 @@
+// ==UserScript==
+// @id             iitc-plugin-bookmarkUnderDraw
+// @name           IITC plugin: Bookmark portals under draw.
+// @author         Jormund
+// @category       Info
+// @version        0.1.0.20160728.1133
+// @description    [2016-07-28-1133] Bookmark portals under draw.
+// @include        https://www.ingress.com/intel*
+// @include        http://www.ingress.com/intel*
+// @match          https://www.ingress.com/intel*
+// @match          http://www.ingress.com/intel*
+// @grant          none
+// ==/UserScript==
+
+function wrapper(plugin_info) {
+    if(typeof window.plugin !== 'function') window.plugin = function() {};
+
+    // PLUGIN START ////////////////////////////////////////////////////////
+    window.plugin.bookmarkUnderDraw = function() {};
+    window.plugin.bookmarkUnderDraw.datas = {};
+
+    window.plugin.bookmarkUnderDraw.KEY_STORAGE_DRAW_TOOLS = 'plugin-draw-tools-layer';
+
+    //TODO: icône spécifique
+    window.plugin.bookmarkUnderDraw.ico = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAMAAAAoLQ9TAAAAA3NCSVQICAjb4U/gAAAACXBIWXMAAA3XAAAN1wFCKJt4AAAAGXRFWHRTb2Z0d2FyZQB3d3cuaW5rc2NhcGUub3Jnm+48GgAAAGxQTFRF////YGBgcHBwgICAa2treXl5hoaGZGRkgICAj4+Pra2ta2trdHR0e3t7Xl5eubm5bGxsenp6Xl5eZWVlbGxsc3Nzenp6gYGBiIiIj4+PlpaWl5eXnZ2dnp6epKSkpaWlq6urrKyss7Ozurq6UmiuoQAAABJ0Uk5TABAQEBMTE1RUVFRwcHDGxuTki1z6agAAAHZJREFUGNNlz8kOgkAURcFSUcAJkaZxaBz//x9dgNGEysvJ3T4mqvdPBa9/8Fhj/RwKN27cMTZJKUlS3+vh8j1c4VyiHAunf9AVC6uiK1B0EJf1rl5EMUYRWtt2qzVshPlhc8iCEIIATZ6Z5U2OvIH98Wc//d0HokUK52AarhEAAAAASUVORK5CYII=";
+
+    // STORAGE //////////////////////////////////////////////////////////
+    window.plugin.bookmarkUnderDraw.loadStorage = function( key, store ) {
+        if (localStorage[store]) {
+            window.plugin.bookmarkUnderDraw.datas[key] = JSON.parse(localStorage[store]);
+        } else {
+            window.plugin.bookmarkUnderDraw.datas[key] = '';
+        }
+        if (window.plugin.bookmarkUnderDraw.datas[key] == '') {
+            return false;
+        }
+        return true;
+    };
+
+    // FUNCTIONS ////////////////////////////////////////////////////////
+    window.plugin.bookmarkUnderDraw.doTheJob = function() {
+        if (! window.plugin.bookmarkUnderDraw.loadStorage('draw', window.plugin.bookmarkUnderDraw.KEY_STORAGE_DRAW_TOOLS)) {
+            var img = '<img style="vertical-align:middle;" src="data:image/png;base64,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"/>';
+            alert(img + ' A form (polygon or circle) must be drawn');
+            return false;
+        }
+
+        var bookmarkUnderDraw = function() {
+            var t = this;
+            //this.draw_datas = {};
+            this._w_        = {};//work variables
+            this.bookmarkedPortals = {};//bookmarks guids
+            return t;
+        };
+        bookmarkUnderDraw.prototype.initialize = function(datas) {
+            var t = this;
+            t._w_ = {
+                draw_datas : datas,
+                draw_coords : { 'lat' : [], 'lng' : [] },
+                portalsUnderDraw     : []//guids of portals under draw
+            };
+            //t. = datas;
+        };
+        bookmarkUnderDraw.prototype.run = function() {
+            var t = this;
+            $.each(window.plugin.bookmarkUnderDraw.datas.draw, function(id, formdatas) {
+                t.initialize(formdatas);
+                switch(t._w_.draw_datas.type) {
+                    case 'circle':
+                        if (!t.underCircle()) {
+                            return;
+                        }
+                        t.bookmarkPortals();
+                        break;
+                    case 'polygon':
+                        if (!t.underPoligon()) {
+                            return;
+                        }
+                        t.bookmarkPortals();
+                        break;
+                    default:
+                        console.log('Bookmark Under Draw ERROR : invalid draw type (' + t._w_.draw_datas.type + ')'); 
+                        return;
+                        break;
+                };
+            });
+            t.render();
+        };
+        bookmarkUnderDraw.prototype.latlngPoligon = function() {
+            var t = this;
+            $.each(t._w_.draw_datas.latLngs, function(id, point) {
+                t._w_.draw_coords.lat.push(point.lat);	
+                t._w_.draw_coords.lng.push(point.lng);	
+            });
+        };
+        bookmarkUnderDraw.prototype.latlngCircle = function() {
+            var t = this;
+            t._w_.draw_coords.lat.push(t._w_.draw_datas.latLng.lat);	
+            t._w_.draw_coords.lng.push(t._w_.draw_datas.latLng.lng);
+        };        
+        bookmarkUnderDraw.prototype.underPoligon = function() {
+            var t = this;
+            var found = false;
+            t.latlngPoligon();
+            $.each(window.portals, function(guid, r) { 
+                var i, j;
+                var lat_i, lat_j, lng_i, lng_j;
+                var nodeIn = false;
+                var posX = window.portals[guid].getLatLng()['lng'];
+                var posY = window.portals[guid].getLatLng()['lat'];
+                var nbpoints = t._w_.draw_coords.lat.length;
+
+                for (i=0, j=1; i < nbpoints; i++, j++) {
+                    if (j == nbpoints) {
+                        j = 0;
+                    }
+                    lat_i = t._w_.draw_coords.lat[i];
+                    lat_j = t._w_.draw_coords.lat[j];
+                    lng_i = t._w_.draw_coords.lng[i];
+                    lng_j = t._w_.draw_coords.lng[j];
+
+                    if ((( lat_i < posY)  && ( lat_j >= posY)) ||
+                        (( lat_j  < posY)  && ( lat_i >= posY)) &&
+                        (( lng_i  <= posX) || ( lng_j <= posX))) {
+                        if ( lng_i + (posY - lat_i) /(lat_j -lat_i) *(lng_j -lng_i) < posX){
+                            nodeIn = !nodeIn;
+                        }
+                    }
+                }
+
+                if (nodeIn) {
+                    t._w_.portalsUnderDraw.push(guid);
+                    found = true;
+                }            
+            });
+            return found;
+        };
+        bookmarkUnderDraw.prototype.underCircle = function() {
+            var t = this;
+            var found = false;
+            t.latlngCircle();
+            var circle = L.circle([t._w_.draw_coords.lat[0], t._w_.draw_coords.lng[0]], t._w_.draw_datas.radius,  '');
+            var circlebounds = circle.getBounds();
+            var circlecenter = circlebounds.getCenter();
+            $.each(window.portals, function(guid, r) {
+                if (circlecenter.distanceTo(window.portals[guid].getLatLng()) <= t._w_.draw_datas.radius) {
+                    t._w_.portalsUnderDraw.push(guid);
+                    found = true;
+                }
+            });
+            return found;
+        };
+        bookmarkUnderDraw.prototype.bookmarkPortals = function() {
+            var t = this;
+
+            $.each(t._w_.portalsUnderDraw, function(index, guid) {
+                var portal = window.portals[guid];
+                var ll = portal.getLatLng();
+                var portalName = portal.options.data.title;
+                if(typeof t.bookmarkedPortals[guid] == 'undefined') {//we check if portal was added by our loop, can happen if draws overlap
+                    var bkmrkData = window.plugin.bookmarks.findByGuid(guid);
+                    if(bkmrkData) {
+                        //bookmark exists
+                    }
+                    else {
+                        window.plugin.bookmarks.addPortalBookmark(guid, ll.lat+','+ll.lng, portalName);//actually bookmarks the portal
+                    }
+                    t.bookmarkedPortals[guid] = {};//keep result for the count and the next checks
+                }
+                else {
+                    //bookmark exists
+                }
+            });
+        };
+        
+        bookmarkUnderDraw.prototype.render = function() {
+            var t = this;
+
+            var html = '<div class="bookmark-under-draw-box">';
+            var bookmarkedPortalCount = Object.keys(t.bookmarkedPortals).length;
+            if(bookmarkedPortalCount >0) {
+                if(bookmarkedPortalCount==1)
+                    html+= bookmarkedPortalCount + ' portal was bookmarked';
+                else
+                    html+= bookmarkedPortalCount + ' portals were bookmarked';
+            }
+            else {
+                html += 'No portal was bookmarked';
+            }
+            html += '</div>';
+
+            if ($('#loadlevel').html() != 'all') {
+                html += "<div style='margin:5px; padding-top:10px; color:red'>"
+                + "<strong>Your attention please ! </strong><br />"
+                + "<font style='color:white'>Zoom level is actually <span style='color:yellow;'><b>" + $('#loadlevel').html() + "</b></span>. "
+                + "Some portals might not be visible and cannot be bookmarked. Please adjust your zoom level and run Bookmarks Under Draw again.</font>"
+                + "</div>";
+            }
+
+            dialog({
+                width:'600px',
+                html: html,
+                id: 'plugin-bookmarkUnderDraw-box',
+                dialogClass: '',
+                title: 'Bookmarks Under Draw - results',
+            });
+            
+//            $('nav>a').click(function() {
+//                $('nav>a').removeClass('clicked');
+//                $(this).addClass('clicked');
+//                $('.tabs>section').attr('style', 'display:none');
+//                $('#'+$(this).attr('data-section')).attr('style', 'display:bloc');
+//            });
+        };
+
+        var ap = new bookmarkUnderDraw();
+        ap.run();
+    };
+
+    // init setup
+    window.plugin.bookmarkUnderDraw.setup  = function() {
+        console.log('Bookmarks Under Draw loaded.');
+        if (!window.plugin.bookmarks) {
+            console.log('ERROR : Bookmarks plugin required');
+            return false;
+        }
+        if (!window.plugin.drawTools) {
+            console.log('ERROR : Draw tools plugin required');
+            return false;
+        }
+        window.plugin.bookmarkUnderDraw.addButtons();
+    };
+
+    // toolbox menu
+    window.plugin.bookmarkUnderDraw.addButtons = function() {
+        $('head').append('<style>.audtable { border-collapse:collapse; width: 100%; } .audtable > thead > tr > th, .audtable > tbody> tr > td{ border:1px solid #20A8B1;  font-size:12px; padding:3px; font-weight:normal; }</style>');
+        $('head').append('<style>.leaflet-control-bookmark-under-draw a{background-image:url(' + window.plugin.bookmarkUnderDraw.ico + ')!important; background-repeat:no-repeat;}</style>');
+//        $("head").append('<link rel="stylesheet" type="text/css" href="' + ppud_css_ui + '" />');        
+        //$('.leaflet-draw-toolbar-top').append('<a onclick="window.plugin.bookmarkUnderDraw.doTheJob();" class="leaflet-draw-draw-calculator" href="#" title="Show export under Draw" style="background-image:url(' + ppud_ico_ap + ')!important; background-repeat:no-repeat;"></a>');
+        var parent = $(".leaflet-top.leaflet-left", window.map.getContainer());
+
+	    var button = document.createElement("a");
+	    button.className = "leaflet-bar-part";//background-image:url(' + ppud_ico_ap + ')!important; background-repeat:no-repeat;
+	    button.addEventListener("click", window.plugin.bookmarkUnderDraw.doTheJob, false);
+	    button.title = 'Bookmark portals';
+
+//	    var tooltip = document.createElement("div");
+//	    tooltip.className = "leaflet-control-bookmark-under-draw-tooltip";
+//	    button.appendChild(tooltip);
+
+	    var container = document.createElement("div");
+	    container.className = "leaflet-control-bookmark-under-draw leaflet-bar leaflet-control";
+	    container.appendChild(button);
+	    parent.append(container);
+
+	    plugin.layerCount.button = button;
+	    plugin.layerCount.tooltip = tooltip;
+	    plugin.layerCount.container = container;
+    };
+
+    // runrun
+    var setup =  window.plugin.bookmarkUnderDraw.setup;
+
+    setup.info = plugin_info; //add the script info data to the function as a property
+    if(!window.bootPlugins) window.bootPlugins = [];
+    window.bootPlugins.push(setup);
+    // if IITC has already booted, immediately run the 'setup' function
+    if(window.iitcLoaded && typeof setup === 'function') {
+        setup();
+    }
+
+    // PLUGIN END ////////////////////////////////////////////////////////    
+} // WRAPPER END ////////////////////////////////////////////////////////    
+
+var script = document.createElement('script');
+var info = {};
+if (typeof GM_info !== 'undefined' && GM_info && GM_info.script) info.script = { version: GM_info.script.version, name: GM_info.script.name, description: GM_info.script.description };
+script.appendChild(document.createTextNode('('+ wrapper +')('+JSON.stringify(info)+');'));
+(document.body || document.head || document.documentElement).appendChild(script);
