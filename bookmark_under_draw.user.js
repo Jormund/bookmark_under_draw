@@ -1,10 +1,10 @@
 // ==UserScript==
 // @id             iitc-plugin-bookmarkUnderDraw
-// @name           IITC plugin: Bookmark portals under draw.
+// @name           IITC plugin: Bookmark portals under draw or search result.
 // @author         Jormund
 // @category       Controls
-// @version        0.1.1.20160728.1708
-// @description    [2016-07-28-1708] Bookmark portals under draw.
+// @version        0.1.2.20160901.1808
+// @description    [2016-09-01-1808] Bookmark portals under draw or search result.
 // @downloadURL    https://github.com/Jormund/bookmark_under_draw/raw/master/bookmark_under_draw.user.js
 // @include        https://www.ingress.com/intel*
 // @include        http://www.ingress.com/intel*
@@ -23,10 +23,10 @@ function wrapper(plugin_info) {
     window.plugin.bookmarkUnderDraw.KEY_STORAGE_DRAW_TOOLS = 'plugin-draw-tools-layer';
 
     //star icon
-//    window.plugin.bookmarkUnderDraw.ico = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="30" height="30">'
-//	                                            + '<g style="fill: #FACA00; fill-opacity: 1; stroke: none;">'
-//                                                    + '<path d="M 15,1 18,12 29,12 20,18 24,28 15,21 6,28 10,18 1,12 12,12 Z" />'
-//	                                            + '</g>'
+    //    window.plugin.bookmarkUnderDraw.ico = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="30" height="30">'
+    //	                                            + '<g style="fill: #FACA00; fill-opacity: 1; stroke: none;">'
+    //                                                    + '<path d="M 15,1 18,12 29,12 20,18 24,28 15,21 6,28 10,18 1,12 12,12 Z" />'
+    //	                                            + '</g>'
     //                                            + '</svg>';//utf-8 svg not working for reason unknown, using base64 instead
     window.plugin.bookmarkUnderDraw.bookmarkIcon = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIzMCIgaGVpZ2h0PSIzMCI+DQoJPGcgc3R5bGU9ImZpbGw6ICNGQUNBMDA7IGZpbGwtb3BhY2l0eTogMTsgc3Ryb2tlOiBub25lOyI+DQogICAgPHBhdGggZD0iTSAxNSwxIDE4LDEyIDI5LDEyIDIwLDE4IDI0LDI4IDE1LDIxIDYsMjggMTAsMTggMSwxMiAxMiwxMiBaIiAvPg0KCTwvZz4NCjwvc3ZnPg==";
 
@@ -42,14 +42,66 @@ function wrapper(plugin_info) {
         }
         return true;
     };
+    //    window.plugin.bookmarkUnderDraw.testClicked = function () {
+    //        try {
+    //            if (window.search.lastSearch &&
+    //            window.search.lastSearch.selectedResult &&
+    //            window.search.lastSearch.selectedResult.layer) {
+    //                window.search.lastSearch.selectedResult.layer.eachLayer(function (l) {
+    //                    if (l instanceof L.MultiPolygon ||
+    //                                l instanceof L.Polygon) {
+    //                        var searchPolyline = {
+    //                            type: 'polygon',
+    //                            latLngs: l.toGeoJSON().geometry.coordinates
+    //                        };
+    //                        console.log(searchPolyline);
+    //                    }
+    //                });
+    //            }
+    //        }
+    //        catch (err) {
+    //            alert(err.stack);
+    //        }
+    //    };
 
     // FUNCTIONS ////////////////////////////////////////////////////////
     window.plugin.bookmarkUnderDraw.doTheJob = function () {
-        if (!window.plugin.bookmarkUnderDraw.loadStorage('draw', window.plugin.bookmarkUnderDraw.KEY_STORAGE_DRAW_TOOLS)) {
+        var loadDraws = window.plugin.bookmarkUnderDraw.loadStorage('draw', window.plugin.bookmarkUnderDraw.KEY_STORAGE_DRAW_TOOLS);
+
+        if (typeof window.plugin.bookmarkUnderDraw.datas.draw == 'undefined'
+            || window.plugin.bookmarkUnderDraw.datas.draw == '')
+            window.plugin.bookmarkUnderDraw.datas.draw = [];
+
+        //if search, add it to job
+        if (window.search.lastSearch &&
+            window.search.lastSearch.selectedResult &&
+            window.search.lastSearch.selectedResult.layer) {
+
+            window.search.lastSearch.selectedResult.layer.eachLayer(function (l) {
+                if (l instanceof L.MultiPolygon ||
+                            l instanceof L.Polygon) {
+                    var latLngArr = l.toGeoJSON().geometry.coordinates[0];
+                    var latLngs = [];
+                    $.each(latLngArr, function (index, latlng) {
+                        var obj = { lng: latlng[0], lat: latlng[1] };
+                        latLngs.push(obj);
+                    });
+                    var searchPolyline = {
+                        type: 'polygon',
+                        latLngs: latLngs
+                    }
+                    window.plugin.bookmarkUnderDraw.datas.draw.push(searchPolyline);
+                }
+            });
+        }
+
+        if (window.plugin.bookmarkUnderDraw.datas.draw.length == 0) {
             var img = '<img style="vertical-align:middle;" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAGE0lEQVR4nMWXbWxUWRnHf885985Mh2lnpm8zLeVlS3mp1qGgFigLUyltpcTZalsENST4icSYXXenbDZt4uqaGDG4H0gaNVk0uyvuayK4omY1K1kN8SVGDYlb1oSlVGophYUy05nOzD1+mBkKkgWKLJzkn5Obe+7z/93nec7cOWKM4UEO9UDdAetuHhoaHKo1xpwpLS21EonE7NTFqbbh4eET9w1AKXV0W/c2a8OGDYyPj7sOHjz4uojUGWOcecea7wPxeDwWrgl/fGHFAiYPfZqyEs3SJUtruru7H5tvrLsC8Lg9z2/fvp333/o2iCIzcpSdu3ayds3a/SIS+lAB4k/En2pqavInT5+g1n0FEUX2naNYuSTRaFTv3r37BRHRHxqAz+d7ZmtHO653XwZRoDQoReZPzxKNbmZ5w/IO4KH5xLzjJhyID7wZi8X0xJ9fowTDuasaARBQyXdZ/N5x+vr7GBsb+62IrDLGzNwzgKHBodpgMNgeaVpF5o0DfP2tJD97+51r9+vq6vjFosMs7/why5YtWxyNRvuAF+4k9h2VIJ1On4g9EpN//+YAyhKS6dmb1vjKpph57zB7vryHdevWfV9EgvcEIB6Px+rr6xeXWWnCzgjKY1jguXmdLgFP4nUCfi+RSMTb39//XRGR/xvA4/a8snPXTsxf9qM9oD1QEbBvBijcc8a+SW9vL5GPRfYAdbeLf8se2Dew78CmTZvcF08dp7I0g3KDduWbvziMMWAMyg2I4DIjJNOjdG/frkZHR4+KSIsxJvNBHh+YgaHBoVqfz/fo+vXrKD33E3TR3A1ocByH9MwM01cuk5qZATW3Lb3T3yMSaaKxsbG5vb29964ykEqlXuvq6tJXTh6musRBuUEVAMoDLhJXp0kmk2AMOSeXNxfJ/z5wicTkr9jx+R2Mj48Pi8gbxpird5yBocGhT4bD4fVrm5uonv0D2g3KLSiPoN1QVeUhmUhgWxZ+v59PNJWBMwVMgboCtsZvvUQoVElDQ0Owq6vrK/PKQCaT+XV/f79MvP0M1XIe0pchO4lk00jmEjK7Cq01Pp+P8vJyFoaA2eP5aE5BGlKTAb74pf2cPXv2WyJyyBgzeVuA+BPxp1asWBH0qgT25I8x3ixSkkNZWbTOoWyHRaEslmXh9XqpqKhgVeMl8M0ZY+VnnxpmOvc40WjUGj07+qKIdBtjcrcsQYm35Bv9O/p4/8hWlMtBuxyUO4d252cEFoWyiAgiglIKEcmbuv5Hbih1tfGpLW00LGvoBJbcMgMD8YE3Ozo77MmTR6j2p1Au5wYIFCDgURM8950l+Wt9iY0bz4AUohWlC1JjXJx6hf4d/YyNjf1SRFYbY1I3ARS2Xfvmh1uZer4e5XdQdkEuB9EmbyJQVZmgd9M/uei2qK7KkMteZ2wXAQSUDXioqn6UQHCMNWvWrGhra+sDXrypBLOzs7/r+WyP/OvIV1lQkr3R3HaumaPgzGUPnY+1saV3JRs/s5H/XPTljV1FAAtUGVAJVAEhksmn2fWFXbS0tPxARAI3AMTj8ViwPLi84aE6aqd/jrKcvOz8LGru7dFw8nQZExPnKS8vp6YmzB//Wps3tgHLBRIAKgrm1UAIv/9vaJ2idUOrt6enZ/AGANuyf7p3717GXvocYhnEcuZ0/dsXAFY3JggEAgQCfmpra1kTuVxIuw34gfICQOU1AAij9XN0dnXSvLr5cRFZCKCTieSB5ubmzUsrNd5Tz6ILHX+9is1XrHFZaYbGlWkqq+Ejjf/go5FzuBcoED8QLAAUFSwogG3nuHAhRP2yiGRmM1tij8QOWbZtf62jcyszr27Dqw1SkLLyovhBLdQ/3/nQ2nKe1ofPz2058QGlhQwErpnmr0uBEsCmpubvhMO7CYfDzUCDpbUW5aQ5PXEF7SnDTuXQiRx6Oov25JAihGKuzkW5illRQNl1hgsAT2FR8dNpCppm5coMLreLUCjUYWUymawvUG1tfvoU92skEkkAZ2JiwifGGJ7c9+R5y7KCxpjb/oO5FyOVTs0cO3bsRyMjI7+X4ulYRFzAQvLFul9H5gvyoI/n/wXy2/DuK2rGkQAAAABJRU5ErkJggg=="/>';
             alert(img + ' A form (polygon or circle) must be drawn');
             return false;
         }
+
+
 
         var bookmarkUnderDraw = function () {
             var t = this;
@@ -68,6 +120,7 @@ function wrapper(plugin_info) {
                 portalsUnderDraw: []//guids of portals under draw
             };
         };
+
         bookmarkUnderDraw.prototype.run = function () {
             var t = this;
             $.each(window.plugin.bookmarkUnderDraw.datas.draw, function (id, formdatas) {
@@ -286,6 +339,11 @@ function wrapper(plugin_info) {
         messageBox.addEventListener("click", window.plugin.bookmarkUnderDraw.messageBoxClicked, false);
         button.appendChild(messageBox);
 
+        //        var buttonTest = document.createElement("a");
+        //        buttonTest.className = "leaflet-bar-part leaflet-control-bookmark-under-draw-bookmark";
+        //        buttonTest.addEventListener("click", window.plugin.bookmarkUnderDraw.testClicked, false);
+        //        buttonTest.title = 'Bookmark portals';
+        //        container.appendChild(buttonTest);
         //        var tooltipContainer = document.createElement("div");
         //	    tooltipContainer.className = "leaflet-control-bookmark-under-draw-messageBox";
         //        var messageBox = document.createElement("a");
