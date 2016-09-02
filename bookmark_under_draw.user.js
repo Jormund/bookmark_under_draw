@@ -3,8 +3,8 @@
 // @name           IITC plugin: Bookmark portals under draw or search result.
 // @author         Jormund
 // @category       Controls
-// @version        0.1.3.20160902.1518
-// @description    [2016-09-02-1518] Bookmark portals under draw or search result.
+// @version        0.1.4.20160902.1800
+// @description    [2016-09-02-1800] Bookmark portals under draw or search result.
 // @downloadURL    https://github.com/Jormund/bookmark_under_draw/raw/master/bookmark_under_draw.user.js
 // @include        https://www.ingress.com/intel*
 // @include        http://www.ingress.com/intel*
@@ -223,15 +223,18 @@ function wrapper(plugin_info) {
                         //bookmark exists
                     }
                     else {
-                        //window.plugin.bookmarks.addPortalBookmark(guid, ll.lat + ',' + ll.lng, portalName); //actually bookmarks the portal
-                        //02/09/2016: only add the bookmark to JS obj to make it faster
-                        var ID = window.plugin.bookmarks.generateID();
-                        // Add bookmark in the localStorage
-                        var latlng = ll.lat + ',' + ll.lng;
-                        var label = portalName;
-                        window.plugin.bookmarks.bkmrksObj['portals'][window.plugin.bookmarks.KEY_OTHER_BKMRK]['bkmrk'][ID] = { "guid": guid, "latlng": latlng, "label": label };
-                        //console.log('bookmarkUnderDraw: added portal ' + ID);
-                        t.bookmarkAddCount++;
+                        if (typeof portalName == 'string') {//add portal only if name is loaded
+                            //window.plugin.bookmarks.addPortalBookmark(guid, ll.lat + ',' + ll.lng, portalName); //actually bookmarks the portal
+                            //02/09/2016: only add the bookmark to JS obj to make it faster
+                            var ID = window.plugin.bookmarks.generateID();
+                            // Add bookmark in the localStorage
+                            var latlng = ll.lat + ',' + ll.lng;
+                            var label = portalName;
+
+                            window.plugin.bookmarks.bkmrksObj['portals'][window.plugin.bookmarks.KEY_OTHER_BKMRK]['bkmrk'][ID] = { "guid": guid, "latlng": latlng, "label": label };
+                            //console.log('bookmarkUnderDraw: added portal ' + ID);
+                            t.bookmarkAddCount++;
+                        }
                     }
                     t.bookmarkedPortals[guid] = {}; //keep result for the count and the next checks
                     t.distinctPortalUnderDrawCount++;
