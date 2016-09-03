@@ -3,8 +3,8 @@
 // @name           IITC plugin: Bookmark portals under draw or search result.
 // @author         Jormund
 // @category       Controls
-// @version        0.1.4.20160902.1800
-// @description    [2016-09-02-1800] Bookmark portals under draw or search result.
+// @version        0.1.5.20160903.2300
+// @description    [2016-09-03-2300] Bookmark portals under draw or search result.
 // @downloadURL    https://github.com/Jormund/bookmark_under_draw/raw/master/bookmark_under_draw.user.js
 // @include        https://www.ingress.com/intel*
 // @include        http://www.ingress.com/intel*
@@ -110,6 +110,9 @@ function wrapper(plugin_info) {
             //this.portalUnderDrawCount = 0;//unused
             this.distinctPortalUnderDrawCount = 0;
             this.bookmarkAddCount = 0;
+			this.wrongDataCount = 0;
+			this.alreadyExistCount = 0;
+			this.foundTwiceCount = 0;
             return t;
         };
         bookmarkUnderDraw.prototype.initialize = function (datas) {
@@ -210,6 +213,14 @@ function wrapper(plugin_info) {
             });
             return found;
         };
+		//used instead of bookmark plugin because the original code makes only 99 different IDs in the same millisecond
+		bookmarkUnderDraw.prototype.generateID = function() {
+			var d = new Date();
+			var ID = Math.floor(Math.random()*1e10)+1;
+			//var ID = d.getTime()+(Math.floor(Math.random()*99)+1);//id1 472 936 881 241
+			ID = 'id'+ID.toString();
+			return ID;
+		  }
         bookmarkUnderDraw.prototype.bookmarkPortals = function () {
             var t = this;
             //t.portalUnderDrawCount += t._w_.portalsUnderDraw.length;//unused
@@ -221,12 +232,13 @@ function wrapper(plugin_info) {
                     var bkmrkData = window.plugin.bookmarks.findByGuid(guid);
                     if (bkmrkData) {
                         //bookmark exists
+						t.alreadyExistCount++;
                     }
                     else {
                         if (typeof portalName == 'string') {//add portal only if name is loaded
                             //window.plugin.bookmarks.addPortalBookmark(guid, ll.lat + ',' + ll.lng, portalName); //actually bookmarks the portal
                             //02/09/2016: only add the bookmark to JS obj to make it faster
-                            var ID = window.plugin.bookmarks.generateID();
+                            var ID = t.generateID();
                             // Add bookmark in the localStorage
                             var latlng = ll.lat + ',' + ll.lng;
                             var label = portalName;
@@ -235,12 +247,16 @@ function wrapper(plugin_info) {
                             //console.log('bookmarkUnderDraw: added portal ' + ID);
                             t.bookmarkAddCount++;
                         }
+						else {
+							t.wrongDataCount++;
+						}
                     }
                     t.bookmarkedPortals[guid] = {}; //keep result for the count and the next checks
                     t.distinctPortalUnderDrawCount++;
                 }
                 else {
                     //bookmark exists
+					t.foundTwiceCount++;
                 }
             });
             //02/09/2016: only refresh once
@@ -267,6 +283,10 @@ function wrapper(plugin_info) {
                 message += 'No portal found';
             }
             message += ', ' + bookmarkedPortalCount + ' new';
+			if(t.alreadyExistCount > 0)
+				message += ', '+t.alreadyExistCount+' old';			
+			if(t.wrongDataCount > 0)
+				message += ', '+t.wrongDataCount+' not loaded';
 
             var zoomLevel = $('#loadlevel').html();
             if (zoomLevel != 'all') {
