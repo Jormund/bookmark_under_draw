@@ -3,8 +3,8 @@
 // @name           IITC plugin: Bookmark portals under draw or search result.
 // @author         Jormund
 // @category       Controls
-// @version        0.1.5.20160903.2300
-// @description    [2016-09-03-2300] Bookmark portals under draw or search result.
+// @version        0.1.6.20160913.1324
+// @description    [2016-09-13-1324] Bookmark portals under draw or search result.
 // @downloadURL    https://github.com/Jormund/bookmark_under_draw/raw/master/bookmark_under_draw.user.js
 // @include        https://www.ingress.com/intel*
 // @include        http://www.ingress.com/intel*
@@ -19,8 +19,14 @@ function wrapper(plugin_info) {
     // PLUGIN START ////////////////////////////////////////////////////////
     window.plugin.bookmarkUnderDraw = function () { };
     window.plugin.bookmarkUnderDraw.datas = {};
+    
 
+    window.plugin.bookmarkUnderDraw.KEY_STORAGE = 'bookmarkUnderDraw-storage';
     window.plugin.bookmarkUnderDraw.KEY_STORAGE_DRAW_TOOLS = 'plugin-draw-tools-layer';
+
+    window.plugin.bookmarkUnderDraw.DEFAULT_FOLDER_ID = 'idOthers'; //using string constant because bookmark plugin might not be loaded yet
+
+    window.plugin.bookmarkUnderDraw.storage = { folderId: window.plugin.bookmarkUnderDraw.DEFAULT_FOLDER_ID };
 
     //star icon
     //    window.plugin.bookmarkUnderDraw.ico = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="30" height="30">'
@@ -31,7 +37,7 @@ function wrapper(plugin_info) {
     window.plugin.bookmarkUnderDraw.bookmarkIcon = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIzMCIgaGVpZ2h0PSIzMCI+DQoJPGcgc3R5bGU9ImZpbGw6ICNGQUNBMDA7IGZpbGwtb3BhY2l0eTogMTsgc3Ryb2tlOiBub25lOyI+DQogICAgPHBhdGggZD0iTSAxNSwxIDE4LDEyIDI5LDEyIDIwLDE4IDI0LDI4IDE1LDIxIDYsMjggMTAsMTggMSwxMiAxMiwxMiBaIiAvPg0KCTwvZz4NCjwvc3ZnPg==";
 
     // STORAGE //////////////////////////////////////////////////////////
-    window.plugin.bookmarkUnderDraw.loadStorage = function (key, store) {
+    window.plugin.bookmarkUnderDraw.loadDrawStorage = function (key, store) {
         if (localStorage[store]) {
             window.plugin.bookmarkUnderDraw.datas[key] = JSON.parse(localStorage[store]);
         } else {
@@ -66,7 +72,7 @@ function wrapper(plugin_info) {
 
     // FUNCTIONS ////////////////////////////////////////////////////////
     window.plugin.bookmarkUnderDraw.doTheJob = function () {
-        var loadDraws = window.plugin.bookmarkUnderDraw.loadStorage('draw', window.plugin.bookmarkUnderDraw.KEY_STORAGE_DRAW_TOOLS);
+        var loadDraws = window.plugin.bookmarkUnderDraw.loadDrawStorage('draw', window.plugin.bookmarkUnderDraw.KEY_STORAGE_DRAW_TOOLS);
 
         if (typeof window.plugin.bookmarkUnderDraw.datas.draw == 'undefined'
             || window.plugin.bookmarkUnderDraw.datas.draw == '')
@@ -110,9 +116,10 @@ function wrapper(plugin_info) {
             //this.portalUnderDrawCount = 0;//unused
             this.distinctPortalUnderDrawCount = 0;
             this.bookmarkAddCount = 0;
-			this.wrongDataCount = 0;
-			this.alreadyExistCount = 0;
-			this.foundTwiceCount = 0;
+            this.wrongDataCount = 0;
+            this.alreadyExistCount = 0;
+            this.foundTwiceCount = 0;
+            this.folderId = window.plugin.bookmarkUnderDraw.storage.folderId;
             return t;
         };
         bookmarkUnderDraw.prototype.initialize = function (datas) {
@@ -213,16 +220,17 @@ function wrapper(plugin_info) {
             });
             return found;
         };
-		//used instead of bookmark plugin because the original code makes only 99 different IDs in the same millisecond
-		bookmarkUnderDraw.prototype.generateID = function() {
-			var d = new Date();
-			var ID = Math.floor(Math.random()*1e10)+1;
-			//var ID = d.getTime()+(Math.floor(Math.random()*99)+1);//id1 472 936 881 241
-			ID = 'id'+ID.toString();
-			return ID;
-		  }
+        //used instead of bookmark plugin because the original code makes only 99 different IDs in the same millisecond
+        bookmarkUnderDraw.prototype.generateID = function () {
+            var d = new Date();
+            var ID = Math.floor(Math.random() * 1e10) + 1;
+            //var ID = d.getTime()+(Math.floor(Math.random()*99)+1);//id1 472 936 881 241
+            ID = 'id' + ID.toString();
+            return ID;
+        }
         bookmarkUnderDraw.prototype.bookmarkPortals = function () {
             var t = this;
+            var folderBkmrks = window.plugin.bookmarks.bkmrksObj['portals'][this.folderId]['bkmrk'];
             //t.portalUnderDrawCount += t._w_.portalsUnderDraw.length;//unused
             $.each(t._w_.portalsUnderDraw, function (index, guid) {
                 var portal = window.portals[guid];
@@ -232,7 +240,7 @@ function wrapper(plugin_info) {
                     var bkmrkData = window.plugin.bookmarks.findByGuid(guid);
                     if (bkmrkData) {
                         //bookmark exists
-						t.alreadyExistCount++;
+                        t.alreadyExistCount++;
                     }
                     else {
                         if (typeof portalName == 'string') {//add portal only if name is loaded
@@ -242,27 +250,26 @@ function wrapper(plugin_info) {
                             // Add bookmark in the localStorage
                             var latlng = ll.lat + ',' + ll.lng;
                             var label = portalName;
-
-                            window.plugin.bookmarks.bkmrksObj['portals'][window.plugin.bookmarks.KEY_OTHER_BKMRK]['bkmrk'][ID] = { "guid": guid, "latlng": latlng, "label": label };
+                            folderBkmrks[ID] = { "guid": guid, "latlng": latlng, "label": label };
                             //console.log('bookmarkUnderDraw: added portal ' + ID);
+                            //window.runHooks('pluginBkmrksEdit', { "target": "portal", "action": "add", "id": ID, "guid": guid });//02/09/2016: only refresh once
                             t.bookmarkAddCount++;
                         }
-						else {
-							t.wrongDataCount++;
-						}
+                        else {
+                            t.wrongDataCount++;
+                        }
                     }
                     t.bookmarkedPortals[guid] = {}; //keep result for the count and the next checks
                     t.distinctPortalUnderDrawCount++;
                 }
                 else {
                     //bookmark exists
-					t.foundTwiceCount++;
+                    t.foundTwiceCount++;
                 }
             });
             //02/09/2016: only refresh once
             window.plugin.bookmarks.saveStorage();
             window.plugin.bookmarks.refreshBkmrks();
-            //window.runHooks('pluginBkmrksEdit', { "target": "portal", "action": "add", "id": ID, "guid": guid });//can't run
             window.runHooks('pluginBkmrksEdit', { "target": "all", "action": "import" });
             console.log('bookmarkUnderDraw: refreshed bookmarks');
         };
@@ -283,10 +290,10 @@ function wrapper(plugin_info) {
                 message += 'No portal found';
             }
             message += ', ' + bookmarkedPortalCount + ' new';
-			if(t.alreadyExistCount > 0)
-				message += ', '+t.alreadyExistCount+' old';			
-			if(t.wrongDataCount > 0)
-				message += ', '+t.wrongDataCount+' not loaded';
+            if (t.alreadyExistCount > 0)
+                message += ', ' + t.alreadyExistCount + ' old';
+            if (t.wrongDataCount > 0)
+                message += ', ' + t.wrongDataCount + ' not loaded';
 
             var zoomLevel = $('#loadlevel').html();
             if (zoomLevel != 'all') {
@@ -299,25 +306,6 @@ function wrapper(plugin_info) {
             setTimeout(function () {
                 messageBox.innerHTML = message;
             }, 10); //setTimeout copied from layer-count, don't know why
-
-
-            //            if ($('#loadlevel').html() != 'all') {
-            //                var html = '<div class="bookmark-under-draw-box">';
-            //                html += "<div style='margin:5px; padding-top:10px; color:red'>"
-            //                + "<strong>Your attention please ! </strong><br />"
-            //                + "<font style='color:white'>Zoom level is actually <span style='color:yellow;'><b>" + $('#loadlevel').html() + "</b></span>. "
-            //                + "Some portals might not be visible and cannot be bookmarked. Please adjust your zoom level and run Bookmarks Under Draw again.</font>"
-            //                + "</div>";
-            //                html += '</div>';
-
-            //                dialog({
-            //                    width:'600px',
-            //                    html: html,
-            //                    id: 'plugin-bookmarkUnderDraw-box',
-            //                    dialogClass: '',
-            //                    title: 'Bookmarks Under Draw - results',
-            //                });
-            //            }
         };
 
         //doTheJob
@@ -332,7 +320,83 @@ function wrapper(plugin_info) {
         btn.classList.remove("active");
         messageBox.textContent = "";
         evt.stopPropagation();
+    };
+
+     // update the localStorage datas
+    window.plugin.bookmarkUnderDraw.saveStorage = function () {
+        localStorage[window.plugin.bookmarkUnderDraw.KEY_STORAGE] = JSON.stringify(window.plugin.bookmarkUnderDraw.storage);
+    };
+
+    // load the localStorage datas
+    window.plugin.bookmarkUnderDraw.loadStorage = function () {
+        if (typeof localStorage[window.plugin.bookmarkUnderDraw.KEY_STORAGE] != "undefined") {
+            window.plugin.bookmarkUnderDraw.storage = JSON.parse(localStorage[window.plugin.bookmarkUnderDraw.KEY_STORAGE]);
+        }
+
+        //ensure default values are always set
+        if (typeof window.plugin.bookmarkUnderDraw.storage.folderId == "undefined") {
+            window.plugin.bookmarkUnderDraw.storage.folderId = window.plugin.bookmarkUnderDraw.DEFAULT_FOLDER_ID;
+        }
+    };
+
+    window.plugin.bookmarkUnderDraw.resetOpt = function () {
+        window.plugin.bookmarkUnderDraw.storage.folderId = window.plugin.bookmarkUnderDraw.DEFAULT_FOLDER_ID;
+
+        window.plugin.bookmarkUnderDraw.saveStorage();
+        window.plugin.bookmarkUnderDraw.openOptDialog();
     }
+    window.plugin.bookmarkUnderDraw.saveOpt = function () {
+        window.plugin.bookmarkUnderDraw.storage.folderId = $('#bookmarkUnderDraw-folderId').val();
+
+        window.plugin.bookmarkUnderDraw.saveStorage();
+    }
+
+    window.plugin.bookmarkUnderDraw.openOptDialog = function () {
+        var html =
+		'<div>' +
+			'<table>';
+        html +=
+			'<tr>' +
+				'<td>' +
+                    'Folder :' +
+                '</td>' +
+				'<td>';
+        html += '<select id="bookmarkUnderDraw-folderId">';
+            //loop on bookmark folders
+            for(folderId in window.plugin.bookmarks.bkmrksObj['portals']){
+                var folder = window.plugin.bookmarks.bkmrksObj['portals'][folderId];
+                var folderName = folderId ==  window.plugin.bookmarks.KEY_OTHER_BKMRK ? 'Root' : folder.label;
+                html += '<option value="'+folderId+
+                            '" '+(window.plugin.bookmarkUnderDraw.storage.folderId == folderId ? 'selected="selected"' : '')+
+                            '>'+folderName+'</option>';
+            }
+        html += '</select>';
+		html +=	'</td>' +
+			'</tr>';
+        html +=
+			'</table>' +
+		'</div>'
+        ;
+        dialog({
+            html: html,
+            id: 'bookmarkUnderDraw_opt',
+            title: 'Bookmark under draw preferences',
+            width: 'auto',
+            buttons: {
+                'Reset': function () {
+                    window.plugin.bookmarkUnderDraw.resetOpt();
+                },
+                'Save': function () {
+                    window.plugin.bookmarkUnderDraw.saveOpt();
+                    $(this).dialog('close');
+                }
+            }
+        });
+    }
+
+    window.plugin.bookmarkUnderDraw.optClicked = function () {
+        window.plugin.bookmarkUnderDraw.openOptDialog();
+    };
 
     // init setup
     window.plugin.bookmarkUnderDraw.setup = function () {
@@ -345,6 +409,11 @@ function wrapper(plugin_info) {
             console.log('ERROR : Draw tools plugin required');
             return false;
         }
+
+        window.plugin.bookmarkUnderDraw.DEFAULT_FOLDER_ID = window.plugin.bookmarks.KEY_OTHER_BKMRK;
+
+        window.plugin.bookmarkUnderDraw.loadStorage();
+
         window.plugin.bookmarkUnderDraw.addButtons();
         console.log('Bookmarks Under Draw loaded.');
     };
@@ -390,6 +459,10 @@ function wrapper(plugin_info) {
         plugin.bookmarkUnderDraw.button = button;
         plugin.bookmarkUnderDraw.messageBox = messageBox;
         plugin.bookmarkUnderDraw.container = container;
+
+
+        //add options menu
+        $('#toolbox').append('<a onclick="window.plugin.bookmarkUnderDraw.optClicked();return false;">Bookmark under draw Opt</a>');
     };
 
     // runrun
