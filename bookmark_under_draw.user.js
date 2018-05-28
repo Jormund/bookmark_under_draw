@@ -15,6 +15,7 @@
 // @match          http://*.ingress.com/intel*
 // @grant          none
 // ==/UserScript==
+//Changelog
 //0.1.9: handle holes (can happen in search result)
 //0.1.8: use same algorithm as layer-count (better approximation of "curved" edges), still not an exact solution for GeodesicPolygons
 //0.1.7: handle ingress.com and www.ingress.com
