@@ -3,8 +3,8 @@
 // @name           IITC plugin: Bookmark portals under draw or search result.
 // @author         Jormund
 // @category       Controls
-// @version        0.1.9.20180528.2303
-// @description    [2018-05-28-2303] Bookmark portals under draw or search result.
+// @version        0.1.10.20180528.2319
+// @description    [2018-05-28-2319] Bookmark portals under draw or search result.
 // @updateURL      https://cdn.rawgit.com/Jormund/bookmark_under_draw/master/bookmark_under_draw.meta.js
 // @downloadURL    https://cdn.rawgit.com/Jormund/bookmark_under_draw/master/bookmark_under_draw.user.js
 // @include        https://ingress.com/intel*
@@ -16,6 +16,7 @@
 // @grant          none
 // ==/UserScript==
 //Changelog
+//0.1.10: preference dialog now opens with the star button (removed from portal detail)
 //0.1.9: handle holes (can happen in search result)
 //0.1.8: use same algorithm as layer-count (better approximation of "curved" edges), still not an exact solution for GeodesicPolygons
 //0.1.7: handle ingress.com and www.ingress.com
@@ -170,7 +171,7 @@ function wrapper(plugin_info) {
         return result;
     };
 
-    window.plugin.bookmarkUnderDraw.doTheJob = function () {
+    window.plugin.bookmarkUnderDraw.doTheJob = function (options) {
         if (!window.plugin.bookmarks) {
             console.log('Bookmarks Under Draw ERROR : Bookmark plugin required');
             alert('Bookmarks plugin required');
@@ -405,7 +406,7 @@ function wrapper(plugin_info) {
         };
 
         //doTheJob
-        var options = window.plugin.bookmarkUnderDraw.storage;
+        //var options = window.plugin.bookmarkUnderDraw.storage;
         var worker = new bookmarkUnderDraw(options);
         window.plugin.bookmarkUnderDraw.work.lastWorker = worker; //debug
         worker.initialize(window.plugin.bookmarkUnderDraw.work.searchItems);
@@ -430,13 +431,20 @@ function wrapper(plugin_info) {
         window.plugin.bookmarkUnderDraw.saveStorage();
         window.plugin.bookmarkUnderDraw.openOptDialog();
     }
-    window.plugin.bookmarkUnderDraw.saveOpt = function () {
-        window.plugin.bookmarkUnderDraw.storage.folderId = $('#bookmarkUnderDraw-folderId').val();
-        window.plugin.bookmarkUnderDraw.storage.notLoadedPortalName = $('#bookmarkUnderDraw-notLoadedPortalName').val();
-        window.plugin.bookmarkUnderDraw.storage.bookmarkUnknownPortal = $('#bookmarkUnderDraw-bookmarkUnknownPortal').is(":checked");
-        window.plugin.bookmarkUnderDraw.storage.bookmarkHiddenPortal = $('#bookmarkUnderDraw-bookmarkHiddenPortal').is(":checked");
-
+    window.plugin.bookmarkUnderDraw.saveOptAndBookmarkPortals = function () {
+		var options = {};
+		options.folderId = $('#bookmarkUnderDraw-folderId').val();
+        options.notLoadedPortalName = $('#bookmarkUnderDraw-notLoadedPortalName').val();
+        options.bookmarkUnknownPortal = $('#bookmarkUnderDraw-bookmarkUnknownPortal').is(":checked");
+        options.bookmarkHiddenPortal = $('#bookmarkUnderDraw-bookmarkHiddenPortal').is(":checked");
+		
+        window.plugin.bookmarkUnderDraw.storage.folderId = options.folderId;
+        window.plugin.bookmarkUnderDraw.storage.notLoadedPortalName = options.notLoadedPortalName;
+        window.plugin.bookmarkUnderDraw.storage.bookmarkUnknownPortal = options.bookmarkUnknownPortal;
+        window.plugin.bookmarkUnderDraw.storage.bookmarkHiddenPortal = options.bookmarkHiddenPortal;
         window.plugin.bookmarkUnderDraw.saveStorage();
+		
+		window.plugin.bookmarkUnderDraw.doTheJob(options);
     }
 
     window.plugin.bookmarkUnderDraw.openOptDialog = function () {
@@ -501,15 +509,15 @@ function wrapper(plugin_info) {
         dialog({
             html: html,
             id: 'bookmarkUnderDraw_opt',
-            title: 'Bookmark under draw preferences',
+            title: 'Bookmark under draw',
             width: 'auto',
             buttons: {
                 'Reset': function () {
                     window.plugin.bookmarkUnderDraw.resetOpt();
                 },
-                'Save': function () {
-                    window.plugin.bookmarkUnderDraw.saveOpt();
-                    $(this).dialog('close');
+                'Bookmark': function () {
+                    window.plugin.bookmarkUnderDraw.saveOptAndBookmarkPortals();
+                    //$(this).dialog('close');
                 }
             }
         });
@@ -557,7 +565,8 @@ function wrapper(plugin_info) {
 
         var button = document.createElement("a");
         button.className = "leaflet-bar-part leaflet-control-bookmark-under-draw-bookmark";
-        button.addEventListener("click", window.plugin.bookmarkUnderDraw.doTheJob, false);
+        //button.addEventListener("click", window.plugin.bookmarkUnderDraw.doTheJob, false);
+		button.addEventListener("click", window.plugin.bookmarkUnderDraw.optClicked, false);
         button.title = 'Bookmark portals';
         container.appendChild(button);
 
@@ -570,9 +579,9 @@ function wrapper(plugin_info) {
         plugin.bookmarkUnderDraw.messageBox = messageBox;
         plugin.bookmarkUnderDraw.container = container;
 
-
+		//0.1.10: removed options menu, replaced by dialog before bookmarking
         //add options menu
-        $('#toolbox').append('<a onclick="window.plugin.bookmarkUnderDraw.optClicked();return false;">Bookmark under draw Opt</a>');
+        //$('#toolbox').append('<a onclick="window.plugin.bookmarkUnderDraw.optClicked();return false;">Bookmark under draw Opt</a>');
     };
 
     // runrun
