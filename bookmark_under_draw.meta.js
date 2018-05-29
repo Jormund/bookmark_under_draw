@@ -3,8 +3,8 @@
 // @name           IITC plugin: Bookmark portals under draw or search result.
 // @author         Jormund
 // @category       Controls
-// @version        0.1.13.20180529.1339
-// @description    [2018-05-29-1339] Bookmark portals under draw or search result.
+// @version        0.1.14.20180529.1446
+// @description    [2018-05-29-1446] Bookmark portals under draw or search result.
 // @updateURL      https://cdn.rawgit.com/Jormund/bookmark_under_draw/master/bookmark_under_draw.meta.js
 // @downloadURL    https://cdn.rawgit.com/Jormund/bookmark_under_draw/master/bookmark_under_draw.user.js
 // @include        https://ingress.com/intel*

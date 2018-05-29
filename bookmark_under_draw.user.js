@@ -3,8 +3,8 @@
 // @name           IITC plugin: Bookmark portals under draw or search result.
 // @author         Jormund
 // @category       Controls
-// @version        0.1.13.20180529.1339
-// @description    [2018-05-29-1339] Bookmark portals under draw or search result.
+// @version        0.1.14.20180529.1446
+// @description    [2018-05-29-1446] Bookmark portals under draw or search result.
 // @updateURL      https://cdn.rawgit.com/Jormund/bookmark_under_draw/master/bookmark_under_draw.meta.js
 // @downloadURL    https://cdn.rawgit.com/Jormund/bookmark_under_draw/master/bookmark_under_draw.user.js
 // @include        https://ingress.com/intel*
@@ -16,6 +16,7 @@
 // @grant          none
 // ==/UserScript==
 //Changelog
+//0.1.14: remove bookmarks under draw or search
 //0.1.13: sort by name
 //0.1.12: buttons to clear draw and bookmarks
 //0.1.11: sort new bookmarks
@@ -36,6 +37,7 @@ function wrapper(plugin_info) {
     window.plugin.bookmarkUnderDraw.KEY_STORAGE = 'bookmarkUnderDraw-storage';
     window.plugin.bookmarkUnderDraw.DRAW_TOOLS_KEY_STORAGE = 'plugin-draw-tools-layer';
 
+    window.plugin.bookmarkUnderDraw.actions = { ADD: 'ADD', REMOVE: 'REMOVE' };
     window.plugin.bookmarkUnderDraw.DEFAULT_FOLDER_ID = 'idOthers'; //using string constant because bookmark plugin might not be loaded yet
     window.plugin.bookmarkUnderDraw.DEFAULT_NOT_LOADED_PORTAL_NAME = 'UNKNOWN PORTAL NAME';
     window.plugin.bookmarkUnderDraw.DEFAULT_BOOKMARK_UNKNOWN_PORTAL = false;
@@ -321,6 +323,7 @@ function wrapper(plugin_info) {
             this.bookmarkedPortals = {}; //bookmarks guids
             this.distinctPortalUnderDrawCount = 0;
             this.bookmarkAddCount = 0;
+            this.bookmarkRemoveCount = 0;
             this.wrongDataCount = 0;
             this.alreadyExistCount = 0;
             //this.foundTwiceCount = 0;//obsolete
@@ -337,8 +340,23 @@ function wrapper(plugin_info) {
         bookmarkUnderDraw.prototype.run = function () {
             var t = this;
 
-            console.log("portals:" + window.portals.length);
-            $.each(window.portals, function (guid, portal) {
+            var input = window.portals;
+            //when removing bookmarks, we can restrict ourselves to bookmarks
+            if (t.options.action == window.plugin.bookmarkUnderDraw.actions.REMOVE) {
+                input = {};
+                var list = window.plugin.bookmarks.bkmrksObj['portals'];
+                for (var idFolders in list) {
+                    for (var idBkmrk in list[idFolders]['bkmrk']) {
+                        var portalGuid = list[idFolders]['bkmrk'][idBkmrk]['guid'];
+                        var portal = window.portals[portalGuid];
+                        if (portal) {
+                            input[portalGuid] = portal;
+                        }
+                    }
+                }
+            }
+            console.log("portals:" + input.length);
+            $.each(input, function (guid, portal) {
                 var point = portal.getLatLng();
                 var found = false;
                 $.each(t._w_.searchItems, function (index, searchItem) {
@@ -368,7 +386,15 @@ function wrapper(plugin_info) {
                     t._w_.portalsUnderDraw.push(guid);
                 }
             });
-            t.bookmarkPortals();
+            if (t.options.action == window.plugin.bookmarkUnderDraw.actions.ADD) {
+                t.bookmarkPortals();
+            }
+            else if (t.options.action == window.plugin.bookmarkUnderDraw.actions.REMOVE) {
+                t.removeBookmarks();
+            }
+            else {
+                //should not happen
+            }
             t.render();
         };
 
@@ -392,6 +418,30 @@ function wrapper(plugin_info) {
             return found;
         };
 
+
+        bookmarkUnderDraw.prototype.removeBookmarks = function () {
+            var t = this;
+
+            $.each(t._w_.portalsUnderDraw, function (index, guid) {
+                var list = window.plugin.bookmarks.bkmrksObj['portals'];
+                var bkmrkData = window.plugin.bookmarks.findByGuid(guid);
+                if (bkmrkData) {
+                    //bookmark exists
+                    t.bookmarkRemoveCount++;
+
+                    delete list[bkmrkData['id_folder']]['bkmrk'][bkmrkData['id_bookmark']]; //inspired by window.plugin.bookmarks.switchStarPortal
+                    //$('.bkmrk#' + bkmrkData['id_bookmark'] + '').remove();//handled by the refresh below
+                }
+                else {
+                    //do nothing
+                }
+            });
+
+            window.plugin.bookmarks.saveStorage();
+            window.plugin.bookmarks.refreshBkmrks();
+            window.runHooks('pluginBkmrksEdit', { "target": "all", "action": "import" });
+            console.log('bookmarkUnderDraw: refreshed bookmarks');
+        }
         //used instead of bookmark plugin because the original code makes only 99 different IDs in the same millisecond
         bookmarkUnderDraw.prototype.generateID = function () {
             var d = new Date();
@@ -402,8 +452,8 @@ function wrapper(plugin_info) {
         }
         bookmarkUnderDraw.prototype.bookmarkPortals = function () {
             var t = this;
-            var folderBkmrks = window.plugin.bookmarks.bkmrksObj['portals'][t.options.folderId]['bkmrk'];
 
+            var folderBkmrks = window.plugin.bookmarks.bkmrksObj['portals'][t.options.folderId]['bkmrk'];
             var newBookmarks = [];
             $.each(t._w_.portalsUnderDraw, function (index, guid) {
                 //if (typeof t.bookmarkedPortals[guid] == 'undefined') {//we check if portal was added by our loop, can happen if draws overlap//28/05/2018: cannot happen since we loop on portals only once
@@ -459,7 +509,6 @@ function wrapper(plugin_info) {
                 folderBkmrks[bookmarkID] = newBookmark;
             });
 
-
             //02/09/2016: only refresh once
             window.plugin.bookmarks.saveStorage();
             window.plugin.bookmarks.refreshBkmrks();
@@ -481,22 +530,35 @@ function wrapper(plugin_info) {
             var t = this;
 
             var message = '';
-            var bookmarkedPortalCount = t.bookmarkAddCount; // Object.keys(t.bookmarkedPortals).length;
-            var totalPortalCount = t.distinctPortalUnderDrawCount;
-            if (totalPortalCount > 0) {
-                if (totalPortalCount == 1)
-                    message += totalPortalCount + ' portal found';
-                else
-                    message += totalPortalCount + ' portals found';
+            if (t.options.action == window.plugin.bookmarkUnderDraw.actions.ADD) {
+                var bookmarkedPortalCount = t.bookmarkAddCount; // Object.keys(t.bookmarkedPortals).length;
+                var totalPortalCount = t.distinctPortalUnderDrawCount;
+                if (totalPortalCount > 0) {
+                    if (totalPortalCount == 1)
+                        message += totalPortalCount + ' portal found';
+                    else
+                        message += totalPortalCount + ' portals found';
+                }
+                else {
+                    message += 'No portal found';
+                }
+                message += ', ' + bookmarkedPortalCount + ' new';
+                if (t.alreadyExistCount > 0)
+                    message += ', ' + t.alreadyExistCount + ' old';
+                if (t.wrongDataCount > 0)
+                    message += ', ' + t.wrongDataCount + ' not loaded';
+            } else if (t.options.action == window.plugin.bookmarkUnderDraw.actions.REMOVE) {
+                if (t.bookmarkRemoveCount > 0) {
+                    if (t.bookmarkRemoveCount == 1)
+                        message += t.bookmarkRemoveCount + ' bookmark removed';
+                    else
+                        message += t.bookmarkRemoveCount + ' bookmarks removed';
+                }
+                else {
+                    message += 'No bookmark removed';
+                }
             }
-            else {
-                message += 'No portal found';
-            }
-            message += ', ' + bookmarkedPortalCount + ' new';
-            if (t.alreadyExistCount > 0)
-                message += ', ' + t.alreadyExistCount + ' old';
-            if (t.wrongDataCount > 0)
-                message += ', ' + t.wrongDataCount + ' not loaded';
+
 
             var zoomLevel = $('#loadlevel').html();
             if (zoomLevel != 'all') {
@@ -523,7 +585,7 @@ function wrapper(plugin_info) {
         evt.stopPropagation();
     };
 
-    //inspired from window.plugin.drawTools.optReset
+    //inspired by window.plugin.drawTools.optReset
     window.plugin.bookmarkUnderDraw.resetDraw = function () {
         if (window.plugin.drawTools) {
             delete localStorage[window.plugin.bookmarkUnderDraw.DRAW_TOOLS_KEY_STORAGE];
@@ -532,7 +594,7 @@ function wrapper(plugin_info) {
             runHooks('pluginDrawTools', { event: 'clear' });
         }
     };
-    //inspired from window.plugin.bookmarks.optReset
+    //inspired by window.plugin.bookmarks.optReset
     window.plugin.bookmarkUnderDraw.resetBookmarks = function () {
         delete localStorage[window.plugin.bookmarks.KEY_STORAGE];
         window.plugin.bookmarks.createStorage();
@@ -550,7 +612,8 @@ function wrapper(plugin_info) {
         window.plugin.bookmarkUnderDraw.saveStorage();
         window.plugin.bookmarkUnderDraw.openOptDialog();
     }
-    window.plugin.bookmarkUnderDraw.saveOptAndBookmarkPortals = function () {
+
+    window.plugin.bookmarkUnderDraw.saveOpt = function () {
         var options = {};
         options.folderId = $('#bookmarkUnderDraw-folderId').val();
         options.notLoadedPortalName = $('#bookmarkUnderDraw-notLoadedPortalName').val();
@@ -570,6 +633,18 @@ function wrapper(plugin_info) {
         window.plugin.bookmarkUnderDraw.storage.bookmarkUnknownPortal = options.bookmarkUnknownPortal;
         window.plugin.bookmarkUnderDraw.storage.bookmarkHiddenPortal = options.bookmarkHiddenPortal;
         window.plugin.bookmarkUnderDraw.saveStorage();
+
+        return options;
+    }
+    window.plugin.bookmarkUnderDraw.saveOptAndRemoveBookmarks = function () {
+        var options = window.plugin.bookmarkUnderDraw.saveOpt();
+        options.action = window.plugin.bookmarkUnderDraw.actions.REMOVE;
+
+        window.plugin.bookmarkUnderDraw.doTheJob(options);
+    }
+    window.plugin.bookmarkUnderDraw.saveOptAndBookmarkPortals = function () {
+        var options = window.plugin.bookmarkUnderDraw.saveOpt();
+        options.action = window.plugin.bookmarkUnderDraw.actions.ADD;
 
         window.plugin.bookmarkUnderDraw.doTheJob(options);
     }
@@ -649,27 +724,49 @@ function wrapper(plugin_info) {
 			'</table>' +
 		'</div>'
         ;
-        dialog({
+        var d = dialog({
             html: html,
             id: 'bookmarkUnderDraw_opt',
             title: 'Bookmark under draw',
             width: 'auto',
-            buttons: {
-                'Clear draw': function () {
-                    window.plugin.bookmarkUnderDraw.resetDraw();
+            buttons: [
+                {
+                    text: 'Reset options',
+                    title: 'Reset Bookmark under draw preferences (this dialog)',
+                    click: function () {
+                        window.plugin.bookmarkUnderDraw.resetOpt();
+                    }
                 },
-                'Clear bookmarks': function () {
-                    window.plugin.bookmarkUnderDraw.resetBookmarks();
+                {
+                    text: 'Clear drawn items',
+                    click: function () {
+                        window.plugin.bookmarkUnderDraw.resetDraw();
+                    }
                 },
-                'Reset options': function () {
-                    window.plugin.bookmarkUnderDraw.resetOpt();
+                {
+                    text: 'Clear all bookmarks',
+                    click: function () {
+                        window.plugin.bookmarkUnderDraw.resetBookmarks();
+                    }
                 },
-                'Bookmark portals': function () {
-                    window.plugin.bookmarkUnderDraw.saveOptAndBookmarkPortals();
-                    //$(this).dialog('close');
+                {
+                    text: 'Remove under draw',
+                    title: 'Remove bookmarks found under draw or search result',
+                    click: function () {
+                        window.plugin.bookmarkUnderDraw.saveOptAndRemoveBookmarks();
+                    }
+                },
+                {
+                    text: 'Add under draw',
+                    title: 'Add bookmarks found under draw or search result',
+                    click: function () {
+                        window.plugin.bookmarkUnderDraw.saveOptAndBookmarkPortals();
+                    }
                 }
-            }
+                ]
         });
+        var dialogId = d.data('id'); //dialog-bookmarkUnderDraw_opt
+        $("#" + dialogId + "").parent().find(".ui-dialog-buttonpane .ui-button .ui-button-text:contains('OK')").parent().hide(); //remove the default OK button
     }
 
     window.plugin.bookmarkUnderDraw.optClicked = function () {
