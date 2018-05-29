@@ -3,8 +3,8 @@
 // @name           IITC plugin: Bookmark portals under draw or search result.
 // @author         Jormund
 // @category       Controls
-// @version        0.1.11.20180529.1122
-// @description    [2018-05-29-1122] Bookmark portals under draw or search result.
+// @version        0.1.13.20180529.1339
+// @description    [2018-05-29-1339] Bookmark portals under draw or search result.
 // @updateURL      https://cdn.rawgit.com/Jormund/bookmark_under_draw/master/bookmark_under_draw.meta.js
 // @downloadURL    https://cdn.rawgit.com/Jormund/bookmark_under_draw/master/bookmark_under_draw.user.js
 // @include        https://ingress.com/intel*
@@ -16,6 +16,8 @@
 // @grant          none
 // ==/UserScript==
 //Changelog
+//0.1.13: sort by name
+//0.1.12: buttons to clear draw and bookmarks
 //0.1.11: sort new bookmarks
 //0.1.10: preference dialog now opens with the star button (removed from portal detail)
 //0.1.9: handle holes (can happen in search result)
@@ -32,6 +34,7 @@ function wrapper(plugin_info) {
 
 
     window.plugin.bookmarkUnderDraw.KEY_STORAGE = 'bookmarkUnderDraw-storage';
+    window.plugin.bookmarkUnderDraw.DRAW_TOOLS_KEY_STORAGE = 'plugin-draw-tools-layer';
 
     window.plugin.bookmarkUnderDraw.DEFAULT_FOLDER_ID = 'idOthers'; //using string constant because bookmark plugin might not be loaded yet
     window.plugin.bookmarkUnderDraw.DEFAULT_NOT_LOADED_PORTAL_NAME = 'UNKNOWN PORTAL NAME';
@@ -44,9 +47,9 @@ function wrapper(plugin_info) {
             compareFunction: function (a, b) {
                 if (a.lng > b.lng) return -1;
                 if (a.lng < b.lng) return 1;
-                //use lat when lng are equal to make the sort stable
-                if (a.lat < b.lat) return -1;
+                //when lng are equal, sort SOUTH_TO_NORTH to make the sort stable
                 if (a.lat > b.lat) return 1;
+                if (a.lat < b.lat) return -1;
                 return 0;
             }
         },
@@ -54,9 +57,9 @@ function wrapper(plugin_info) {
             compareFunction: function (a, b) {
                 if (a.lng > b.lng) return 1;
                 if (a.lng < b.lng) return -1;
-                //use lat when lng are equal to make the sort stable
-                if (a.lat < b.lat) return -1;
+                //when lng are equal, sort SOUTH_TO_NORTH to make the sort stable
                 if (a.lat > b.lat) return 1;
+                if (a.lat < b.lat) return -1;
                 return 0;
             }
         },
@@ -64,9 +67,9 @@ function wrapper(plugin_info) {
             compareFunction: function (a, b) {
                 if (a.lat > b.lat) return -1;
                 if (a.lat < b.lat) return 1;
-                //use lng when lat are equal to make the sort stable
-                if (a.lng < b.lng) return -1;
+                //when lat are equal, sort WEST_TO_EAST to make the sort stable
                 if (a.lng > b.lng) return 1;
+                if (a.lng < b.lng) return -1;
                 return 0;
             }
         },
@@ -74,9 +77,25 @@ function wrapper(plugin_info) {
             compareFunction: function (a, b) {
                 if (a.lat > b.lat) return 1;
                 if (a.lat < b.lat) return -1;
-                //use lng when lat are equal to make the sort stable
-                if (a.lng < b.lng) return -1;
+                //when lat are equal, sort WEST_TO_EAST to make the sort stable
                 if (a.lng > b.lng) return 1;
+                if (a.lng < b.lng) return -1;
+                return 0;
+            }
+        },
+        PORTAL_NAME: { code: "PORTAL_NAME", name: "Portal name",
+            compareFunction: function (a, b) {
+                var comp = a.label.localeCompare(b.label, "en-GB"); //TODO:let user choose locale ?
+                if (comp != 0) return comp;
+                //if (a.label > b.label) return 1;
+                //if (a.label < b.label) return -1;
+                //when equal, use lat&lng to make the sort stable
+                //WEST_TO_EAST
+                if (a.lng > b.lng) return 1;
+                if (a.lng < b.lng) return -1;
+                //SOUTH_TO_NORTH
+                if (a.lat > b.lat) return 1;
+                if (a.lat < b.lat) return -1;
                 return 0;
             }
         }
@@ -86,7 +105,8 @@ function wrapper(plugin_info) {
         window.plugin.bookmarkUnderDraw.sorts.WEST_TO_EAST,
         window.plugin.bookmarkUnderDraw.sorts.EAST_TO_WEST,
         window.plugin.bookmarkUnderDraw.sorts.NORTH_TO_SOUTH,
-        window.plugin.bookmarkUnderDraw.sorts.SOUTH_TO_NORTH
+        window.plugin.bookmarkUnderDraw.sorts.SOUTH_TO_NORTH,
+        window.plugin.bookmarkUnderDraw.sorts.PORTAL_NAME
         ];
     //window.plugin.bookmarkUnderDraw.DEFAULT_SORT = window.plugin.bookmarkUnderDraw.sorts.NONE;
     window.plugin.bookmarkUnderDraw.DEFAULT_SORT_CODE = window.plugin.bookmarkUnderDraw.sorts.NONE.code;
@@ -503,6 +523,23 @@ function wrapper(plugin_info) {
         evt.stopPropagation();
     };
 
+    //inspired from window.plugin.drawTools.optReset
+    window.plugin.bookmarkUnderDraw.resetDraw = function () {
+        if (window.plugin.drawTools) {
+            delete localStorage[window.plugin.bookmarkUnderDraw.DRAW_TOOLS_KEY_STORAGE];
+            window.plugin.drawTools.drawnItems.clearLayers();
+            window.plugin.drawTools.load();
+            runHooks('pluginDrawTools', { event: 'clear' });
+        }
+    };
+    //inspired from window.plugin.bookmarks.optReset
+    window.plugin.bookmarkUnderDraw.resetBookmarks = function () {
+        delete localStorage[window.plugin.bookmarks.KEY_STORAGE];
+        window.plugin.bookmarks.createStorage();
+        window.plugin.bookmarks.loadStorage();
+        window.plugin.bookmarks.refreshBkmrks();
+        window.runHooks('pluginBkmrksEdit', { "target": "all", "action": "reset" });
+    };
     window.plugin.bookmarkUnderDraw.resetOpt = function () {
         window.plugin.bookmarkUnderDraw.storage.folderId = window.plugin.bookmarkUnderDraw.DEFAULT_FOLDER_ID;
         window.plugin.bookmarkUnderDraw.storage.sortCode = window.plugin.bookmarkUnderDraw.DEFAULT_SORT_CODE;
@@ -618,10 +655,16 @@ function wrapper(plugin_info) {
             title: 'Bookmark under draw',
             width: 'auto',
             buttons: {
-                'Reset': function () {
+                'Clear draw': function () {
+                    window.plugin.bookmarkUnderDraw.resetDraw();
+                },
+                'Clear bookmarks': function () {
+                    window.plugin.bookmarkUnderDraw.resetBookmarks();
+                },
+                'Reset options': function () {
                     window.plugin.bookmarkUnderDraw.resetOpt();
                 },
-                'Bookmark': function () {
+                'Bookmark portals': function () {
                     window.plugin.bookmarkUnderDraw.saveOptAndBookmarkPortals();
                     //$(this).dialog('close');
                 }
