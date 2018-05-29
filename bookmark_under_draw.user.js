@@ -3,8 +3,8 @@
 // @name           IITC plugin: Bookmark portals under draw or search result.
 // @author         Jormund
 // @category       Controls
-// @version        0.1.10.20180528.2319
-// @description    [2018-05-28-2319] Bookmark portals under draw or search result.
+// @version        0.1.11.20180529.1122
+// @description    [2018-05-29-1122] Bookmark portals under draw or search result.
 // @updateURL      https://cdn.rawgit.com/Jormund/bookmark_under_draw/master/bookmark_under_draw.meta.js
 // @downloadURL    https://cdn.rawgit.com/Jormund/bookmark_under_draw/master/bookmark_under_draw.user.js
 // @include        https://ingress.com/intel*
@@ -16,6 +16,7 @@
 // @grant          none
 // ==/UserScript==
 //Changelog
+//0.1.11: sort new bookmarks
 //0.1.10: preference dialog now opens with the star button (removed from portal detail)
 //0.1.9: handle holes (can happen in search result)
 //0.1.8: use same algorithm as layer-count (better approximation of "curved" edges), still not an exact solution for GeodesicPolygons
@@ -36,9 +37,63 @@ function wrapper(plugin_info) {
     window.plugin.bookmarkUnderDraw.DEFAULT_NOT_LOADED_PORTAL_NAME = 'UNKNOWN PORTAL NAME';
     window.plugin.bookmarkUnderDraw.DEFAULT_BOOKMARK_UNKNOWN_PORTAL = false;
     window.plugin.bookmarkUnderDraw.DEFAULT_BOOKMARK_HIDDEN_PORTAL = true;
+    window.plugin.bookmarkUnderDraw.sorts = {
+        NONE: { code: "NONE", name: "No sort", compareFunction: function (a, b) { return 0 }
+        },
+        EAST_TO_WEST: { code: "EAST_TO_WEST", name: "East to west",
+            compareFunction: function (a, b) {
+                if (a.lng > b.lng) return -1;
+                if (a.lng < b.lng) return 1;
+                //use lat when lng are equal to make the sort stable
+                if (a.lat < b.lat) return -1;
+                if (a.lat > b.lat) return 1;
+                return 0;
+            }
+        },
+        WEST_TO_EAST: { code: "WEST_TO_EAST", name: "West to east",
+            compareFunction: function (a, b) {
+                if (a.lng > b.lng) return 1;
+                if (a.lng < b.lng) return -1;
+                //use lat when lng are equal to make the sort stable
+                if (a.lat < b.lat) return -1;
+                if (a.lat > b.lat) return 1;
+                return 0;
+            }
+        },
+        NORTH_TO_SOUTH: { code: "NORTH_TO_SOUTH", name: "North to south",
+            compareFunction: function (a, b) {
+                if (a.lat > b.lat) return -1;
+                if (a.lat < b.lat) return 1;
+                //use lng when lat are equal to make the sort stable
+                if (a.lng < b.lng) return -1;
+                if (a.lng > b.lng) return 1;
+                return 0;
+            }
+        },
+        SOUTH_TO_NORTH: { code: "SOUTH_TO_NORTH", name: "South to north",
+            compareFunction: function (a, b) {
+                if (a.lat > b.lat) return 1;
+                if (a.lat < b.lat) return -1;
+                //use lng when lat are equal to make the sort stable
+                if (a.lng < b.lng) return -1;
+                if (a.lng > b.lng) return 1;
+                return 0;
+            }
+        }
+    };
+    window.plugin.bookmarkUnderDraw.sortedSorts = [
+        window.plugin.bookmarkUnderDraw.sorts.NONE,
+        window.plugin.bookmarkUnderDraw.sorts.WEST_TO_EAST,
+        window.plugin.bookmarkUnderDraw.sorts.EAST_TO_WEST,
+        window.plugin.bookmarkUnderDraw.sorts.NORTH_TO_SOUTH,
+        window.plugin.bookmarkUnderDraw.sorts.SOUTH_TO_NORTH
+        ];
+    //window.plugin.bookmarkUnderDraw.DEFAULT_SORT = window.plugin.bookmarkUnderDraw.sorts.NONE;
+    window.plugin.bookmarkUnderDraw.DEFAULT_SORT_CODE = window.plugin.bookmarkUnderDraw.sorts.NONE.code;
 
     window.plugin.bookmarkUnderDraw.storage = {
         folderId: window.plugin.bookmarkUnderDraw.DEFAULT_FOLDER_ID,
+        sortCode: window.plugin.bookmarkUnderDraw.DEFAULT_SORT_CODE,
         notLoadedPortalName: window.plugin.bookmarkUnderDraw.DEFAULT_NOT_LOADED_PORTAL_NAME,
         bookmarkUnknownPortal: window.plugin.bookmarkUnderDraw.DEFAULT_BOOKMARK_UNKNOWN_PORTAL,
         bookmarkHiddenPortal: window.plugin.bookmarkUnderDraw.DEFAULT_BOOKMARK_HIDDEN_PORTAL
@@ -67,6 +122,9 @@ function wrapper(plugin_info) {
         //ensure default values are always set
         if (typeof window.plugin.bookmarkUnderDraw.storage.folderId == "undefined") {
             window.plugin.bookmarkUnderDraw.storage.folderId = window.plugin.bookmarkUnderDraw.DEFAULT_FOLDER_ID;
+        }
+        if (typeof window.plugin.bookmarkUnderDraw.storage.sortCode == "undefined") {
+            window.plugin.bookmarkUnderDraw.storage.sortCode = window.plugin.bookmarkUnderDraw.DEFAULT_SORT_CODE;
         }
         if (typeof window.plugin.bookmarkUnderDraw.storage.notLoadedPortalName == "undefined") {
             window.plugin.bookmarkUnderDraw.storage.notLoadedPortalName = window.plugin.bookmarkUnderDraw.DEFAULT_NOT_LOADED_PORTAL_NAME;
@@ -233,6 +291,10 @@ function wrapper(plugin_info) {
             if (typeof options.notLoadedPortalName == 'undefined') options.notLoadedPortalName = window.plugin.bookmarkUnderDraw.DEFAULT_NOT_LOADED_PORTAL_NAME;
             if (typeof options.bookmarkUnknownPortal == 'undefined') options.bookmarkUnknownPortal = window.plugin.bookmarkUnderDraw.DEFAULT_BOOKMARK_UNKNOWN_PORTAL;
             if (typeof options.bookmarkHiddenPortal == 'undefined') options.bookmarkHiddenPortal = window.plugin.bookmarkUnderDraw.DEFAULT_BOOKMARK_HIDDEN_PORTAL;
+            if (typeof options.sort == 'undefined' || typeof options.sortCode == 'undefined') {
+                options.sortCode = window.plugin.bookmarkUnderDraw.DEFAULT_SORT_CODE;
+                options.sort = window.plugin.bookmarkUnderDraw.sorts[options.sortCode];
+            }
 
             var t = this;
             this._w_ = {}; //work variables
@@ -322,10 +384,8 @@ function wrapper(plugin_info) {
             var t = this;
             var folderBkmrks = window.plugin.bookmarks.bkmrksObj['portals'][t.options.folderId]['bkmrk'];
 
+            var newBookmarks = [];
             $.each(t._w_.portalsUnderDraw, function (index, guid) {
-                var portal = window.portals[guid];
-                var ll = portal.getLatLng();
-                var portalName = portal.options.data.title;
                 //if (typeof t.bookmarkedPortals[guid] == 'undefined') {//we check if portal was added by our loop, can happen if draws overlap//28/05/2018: cannot happen since we loop on portals only once
                 var bkmrkData = window.plugin.bookmarks.findByGuid(guid);
                 if (bkmrkData) {
@@ -333,15 +393,21 @@ function wrapper(plugin_info) {
                     t.alreadyExistCount++;
                 }
                 else {
+                    var portal = window.portals[guid];
+                    var portalName = portal.options.data.title;
                     if (typeof portalName == 'string' || t.options.bookmarkUnknownPortal) {//add portal only if name is loaded or override is chosen
                         if (t.options.bookmarkHiddenPortal || window.map.hasLayer(portal)) {//add portal only if it is not filtered out or override is chosen
+                            var ll = portal.getLatLng();
                             //window.plugin.bookmarks.addPortalBookmark(guid, ll.lat + ',' + ll.lng, portalName); //actually bookmarks the portal
                             //02/09/2016: only add the bookmark to JS obj to make it faster
                             var bookmarkID = t.generateID();
                             // Add bookmark in the localStorage
                             var latlng = ll.lat + ',' + ll.lng;
                             var label = portalName || t.options.notLoadedPortalName;
-                            folderBkmrks[bookmarkID] = { "guid": guid, "latlng": latlng, "label": label };
+                            var newBookmark = { "guid": guid, "latlng": latlng, "label": label,
+                                "id": bookmarkID, lat: ll.lat, lng: ll.lng //used for sort, will be deleted before adding to the bookmark plugin
+                            };
+                            newBookmarks.push(newBookmark);
                             //console.log('bookmarkUnderDraw: added portal ' + ID);
                             //window.runHooks('pluginBkmrksEdit', { "target": "portal", "action": "add", "id": ID, "guid": guid });//02/09/2016: only refresh once
                             t.bookmarkAddCount++;
@@ -359,6 +425,21 @@ function wrapper(plugin_info) {
                 //                    t.foundTwiceCount++;
                 //                }
             });
+            //sort result if a sort is selected
+            if (t.options.sort.code != window.plugin.bookmarkUnderDraw.sorts.NONE.code) {
+                newBookmarks.sort(t.options.sort.compareFunction);
+            }
+
+            //create the bookmarks
+            $.each(newBookmarks, function (index, newBookmark) {
+                var bookmarkID = newBookmark.id;
+                delete newBookmark.id;
+                delete newBookmark.lat;
+                delete newBookmark.lng;
+                folderBkmrks[bookmarkID] = newBookmark;
+            });
+
+
             //02/09/2016: only refresh once
             window.plugin.bookmarks.saveStorage();
             window.plugin.bookmarks.refreshBkmrks();
@@ -402,7 +483,7 @@ function wrapper(plugin_info) {
                 message += ' <span style="color:orange">Portals might be missing. Zoom level :<b>' + zoomLevel + '<b></span>';
             }
 
-            t.setMessage(message, true);//setTimeout copied from layer-count, don't know why
+            t.setMessage(message, true); //setTimeout copied from layer-count, don't know why
         };
 
         //doTheJob
@@ -424,6 +505,7 @@ function wrapper(plugin_info) {
 
     window.plugin.bookmarkUnderDraw.resetOpt = function () {
         window.plugin.bookmarkUnderDraw.storage.folderId = window.plugin.bookmarkUnderDraw.DEFAULT_FOLDER_ID;
+        window.plugin.bookmarkUnderDraw.storage.sortCode = window.plugin.bookmarkUnderDraw.DEFAULT_SORT_CODE;
         window.plugin.bookmarkUnderDraw.storage.notLoadedPortalName = window.plugin.bookmarkUnderDraw.DEFAULT_NOT_LOADED_PORTAL_NAME;
         window.plugin.bookmarkUnderDraw.storage.bookmarkUnknownPortal = window.plugin.bookmarkUnderDraw.DEFAULT_BOOKMARK_UNKNOWN_PORTAL;
         window.plugin.bookmarkUnderDraw.storage.bookmarkHiddenPortal = window.plugin.bookmarkUnderDraw.DEFAULT_BOOKMARK_HIDDEN_PORTAL;
@@ -432,19 +514,27 @@ function wrapper(plugin_info) {
         window.plugin.bookmarkUnderDraw.openOptDialog();
     }
     window.plugin.bookmarkUnderDraw.saveOptAndBookmarkPortals = function () {
-		var options = {};
-		options.folderId = $('#bookmarkUnderDraw-folderId').val();
+        var options = {};
+        options.folderId = $('#bookmarkUnderDraw-folderId').val();
         options.notLoadedPortalName = $('#bookmarkUnderDraw-notLoadedPortalName').val();
         options.bookmarkUnknownPortal = $('#bookmarkUnderDraw-bookmarkUnknownPortal').is(":checked");
         options.bookmarkHiddenPortal = $('#bookmarkUnderDraw-bookmarkHiddenPortal').is(":checked");
-		
+        options.sortCode = $('#bookmarkUnderDraw-sortCode').val();
+        var sort = window.plugin.bookmarkUnderDraw.sorts[options.sortCode];
+        if (typeof sort == 'undefined') {
+            options.sortCode = window.plugin.bookmarkUnderDraw.DEFAULT_SORT_CODE;
+            sort = window.plugin.bookmarkUnderDraw.sorts[options.sortCode];
+        }
+        options.sort = sort;
+
         window.plugin.bookmarkUnderDraw.storage.folderId = options.folderId;
+        window.plugin.bookmarkUnderDraw.storage.sortCode = options.sortCode;
         window.plugin.bookmarkUnderDraw.storage.notLoadedPortalName = options.notLoadedPortalName;
         window.plugin.bookmarkUnderDraw.storage.bookmarkUnknownPortal = options.bookmarkUnknownPortal;
         window.plugin.bookmarkUnderDraw.storage.bookmarkHiddenPortal = options.bookmarkHiddenPortal;
         window.plugin.bookmarkUnderDraw.saveStorage();
-		
-		window.plugin.bookmarkUnderDraw.doTheJob(options);
+
+        window.plugin.bookmarkUnderDraw.doTheJob(options);
     }
 
     window.plugin.bookmarkUnderDraw.openOptDialog = function () {
@@ -487,6 +577,22 @@ function wrapper(plugin_info) {
             html += '<option value="' + folderId +
                             '" ' + (window.plugin.bookmarkUnderDraw.storage.folderId == folderId ? 'selected="selected"' : '') +
                             '>' + folderName + '</option>';
+        }
+        html += '</select>';
+        html += '</td>' +
+			'</tr>';
+        html +=
+			'<tr>' +
+				'<td>' +
+                    'Sort :' +
+                '</td>' +
+				'<td>';
+        html += '<select id="bookmarkUnderDraw-sortCode">';
+        for (var i = 0; i < window.plugin.bookmarkUnderDraw.sortedSorts.length; i++) {
+            var sort = window.plugin.bookmarkUnderDraw.sortedSorts[i];
+            html += '<option value="' + sort.code +
+                            '" ' + (window.plugin.bookmarkUnderDraw.storage.sortCode == sort.code ? 'selected="selected"' : '') +
+                            '>' + sort.name + '</option>';
         }
         html += '</select>';
         html += '</td>' +
@@ -566,7 +672,7 @@ function wrapper(plugin_info) {
         var button = document.createElement("a");
         button.className = "leaflet-bar-part leaflet-control-bookmark-under-draw-bookmark";
         //button.addEventListener("click", window.plugin.bookmarkUnderDraw.doTheJob, false);
-		button.addEventListener("click", window.plugin.bookmarkUnderDraw.optClicked, false);
+        button.addEventListener("click", window.plugin.bookmarkUnderDraw.optClicked, false);
         button.title = 'Bookmark portals';
         container.appendChild(button);
 
@@ -579,7 +685,7 @@ function wrapper(plugin_info) {
         plugin.bookmarkUnderDraw.messageBox = messageBox;
         plugin.bookmarkUnderDraw.container = container;
 
-		//0.1.10: removed options menu, replaced by dialog before bookmarking
+        //0.1.10: removed options menu, replaced by dialog before bookmarking
         //add options menu
         //$('#toolbox').append('<a onclick="window.plugin.bookmarkUnderDraw.optClicked();return false;">Bookmark under draw Opt</a>');
     };
