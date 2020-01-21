@@ -3,8 +3,8 @@
 // @name           IITC plugin: Bookmark portals under draw or search result.
 // @author         Jormund
 // @category       Controls
-// @version        0.1.15.20181031.1930
-// @description    [2018-10-31-1930] Bookmark portals under draw or search result.
+// @version        0.2.0.20200121.1846
+// @description    [2020-01-21-1846] Bookmark portals under draw or search result.
 // @updateURL      https://raw.githubusercontent.com/Jormund/bookmark_under_draw/master/bookmark_under_draw.meta.js
 // @downloadURL    https://raw.githubusercontent.com/Jormund/bookmark_under_draw/master/bookmark_under_draw.user.js
 // @include        https://ingress.com/intel*
@@ -18,6 +18,7 @@
 // @grant          none
 // ==/UserScript==
 //Changelog
+//0.2.0: Fix error with IITC-CE, MultiPolygon doesn't exist in Leaflet 1.4
 //0.1.15: activate on intel.ingress.com, changed download url to github
 //0.1.14: remove bookmarks under draw or search
 //0.1.13: sort by name
@@ -46,9 +47,11 @@ function wrapper(plugin_info) {
     window.plugin.bookmarkUnderDraw.DEFAULT_BOOKMARK_UNKNOWN_PORTAL = false;
     window.plugin.bookmarkUnderDraw.DEFAULT_BOOKMARK_HIDDEN_PORTAL = true;
     window.plugin.bookmarkUnderDraw.sorts = {
-        NONE: { code: "NONE", name: "No sort", compareFunction: function (a, b) { return 0 }
+        NONE: {
+            code: "NONE", name: "No sort", compareFunction: function (a, b) { return 0 }
         },
-        EAST_TO_WEST: { code: "EAST_TO_WEST", name: "East to west",
+        EAST_TO_WEST: {
+            code: "EAST_TO_WEST", name: "East to west",
             compareFunction: function (a, b) {
                 if (a.lng > b.lng) return -1;
                 if (a.lng < b.lng) return 1;
@@ -58,7 +61,8 @@ function wrapper(plugin_info) {
                 return 0;
             }
         },
-        WEST_TO_EAST: { code: "WEST_TO_EAST", name: "West to east",
+        WEST_TO_EAST: {
+            code: "WEST_TO_EAST", name: "West to east",
             compareFunction: function (a, b) {
                 if (a.lng > b.lng) return 1;
                 if (a.lng < b.lng) return -1;
@@ -68,7 +72,8 @@ function wrapper(plugin_info) {
                 return 0;
             }
         },
-        NORTH_TO_SOUTH: { code: "NORTH_TO_SOUTH", name: "North to south",
+        NORTH_TO_SOUTH: {
+            code: "NORTH_TO_SOUTH", name: "North to south",
             compareFunction: function (a, b) {
                 if (a.lat > b.lat) return -1;
                 if (a.lat < b.lat) return 1;
@@ -78,7 +83,8 @@ function wrapper(plugin_info) {
                 return 0;
             }
         },
-        SOUTH_TO_NORTH: { code: "SOUTH_TO_NORTH", name: "South to north",
+        SOUTH_TO_NORTH: {
+            code: "SOUTH_TO_NORTH", name: "South to north",
             compareFunction: function (a, b) {
                 if (a.lat > b.lat) return 1;
                 if (a.lat < b.lat) return -1;
@@ -88,7 +94,8 @@ function wrapper(plugin_info) {
                 return 0;
             }
         },
-        PORTAL_NAME: { code: "PORTAL_NAME", name: "Portal name",
+        PORTAL_NAME: {
+            code: "PORTAL_NAME", name: "Portal name",
             compareFunction: function (a, b) {
                 var comp = a.label.localeCompare(b.label, "en-GB"); //TODO:let user choose locale ?
                 if (comp != 0) return comp;
@@ -112,7 +119,7 @@ function wrapper(plugin_info) {
         window.plugin.bookmarkUnderDraw.sorts.NORTH_TO_SOUTH,
         window.plugin.bookmarkUnderDraw.sorts.SOUTH_TO_NORTH,
         window.plugin.bookmarkUnderDraw.sorts.PORTAL_NAME
-        ];
+    ];
     //window.plugin.bookmarkUnderDraw.DEFAULT_SORT = window.plugin.bookmarkUnderDraw.sorts.NONE;
     window.plugin.bookmarkUnderDraw.DEFAULT_SORT_CODE = window.plugin.bookmarkUnderDraw.sorts.NONE.code;
 
@@ -188,7 +195,7 @@ function wrapper(plugin_info) {
 
         for (var i = 0, j = length - 1; i < length; j = i++) {
             if (((latlngs[i].lat > point.lat) != (latlngs[j].lat > point.lat)) &&
-			(point.lng < latlngs[i].lng + (latlngs[j].lng - latlngs[i].lng) * (point.lat - latlngs[i].lat) / (latlngs[j].lat - latlngs[i].lat))) {
+                (point.lng < latlngs[i].lng + (latlngs[j].lng - latlngs[i].lng) * (point.lat - latlngs[i].lat) / (latlngs[j].lat - latlngs[i].lat))) {
                 c = !c;
             }
         }
@@ -209,15 +216,25 @@ function wrapper(plugin_info) {
         if (drawnItem instanceof L.GeodesicPolygon) {
             //_latlngs contains the Polygon path used to approximate the GeodesicPolygon
             //we use this because the pnpoly algorithm is not suited for GeodesicPolygon and the approximation works better
-            polygonArr = drawnItem._latlngs.map(function (item) { return [item.lng, item.lat] });
+            if (typeof drawnItem._latlngs != "undefined" && drawnItem._latlngs.length > 0) {
+                if (typeof drawnItem._latlngs[0].lng == "number") {
+                    polygonArr = drawnItem._latlngs.map(function (item) { return [item.lng, item.lat] });
+                    polygonArr = [polygonArr]; //handle simple polygon like a multipolygon of one polygon only
+                } else if (typeof drawnItem._latlngs[0][0].lng == "number") {
+                    $.each(drawnItem._latlngs, function (i, latLngs) {//each latLngs is a polygon of a multipolygon
+                        var innerPolygonArr = latLngs.map(function (item) { return [item.lng, item.lat] });
+                        polygonArr.push(innerPolygonArr);
+                    });
+                }
+            }
         }
         else {
             //console.log("Not a GeodesicPolygon");
             polygonArr = drawnItem.toGeoJSON().geometry.coordinates;
-        }
-        if (drawnItem instanceof L.Polygon && !(drawnItem instanceof L.MultiPolygon)) {
-            //console.log("Not a MultiPolygon");
-            polygonArr = [polygonArr]; //handle simple polygon like a multipolygon of one polygon only
+            if (polygonArr[0].length == 2 && typeof polygonArr[0][0] == "number") {
+                //console.log("Not a MultiPolygon");
+                polygonArr = [polygonArr]; //handle simple polygon like a multipolygon of one polygon only
+            }
         }
         //console.log("polygonArr:"+polygonArr.length);
         $.each(polygonArr, function (i, polygonCoords) {//each polygonCoords is a polygon of a multipolygon
@@ -291,7 +308,7 @@ function wrapper(plugin_info) {
             window.search.lastSearch.selectedResult.layer) {
 
             window.search.lastSearch.selectedResult.layer.eachLayer(function (drawnItem) {
-                if (drawnItem instanceof L.MultiPolygon || drawnItem instanceof L.Polygon) {
+                if (drawnItem instanceof L.Polygon || (typeof L.MultiPolygon == "function" && drawnItem instanceof L.MultiPolygon)) {
                     var searchPolygons = window.plugin.bookmarkUnderDraw.multiPolygonToSearchPolygons(drawnItem);
                     $.each(searchPolygons, function (index, searchItem) {
                         window.plugin.bookmarkUnderDraw.work.searchItems.push(searchItem);
@@ -477,7 +494,8 @@ function wrapper(plugin_info) {
                             // Add bookmark in the localStorage
                             var latlng = ll.lat + ',' + ll.lng;
                             var label = portalName || t.options.notLoadedPortalName;
-                            var newBookmark = { "guid": guid, "latlng": latlng, "label": label,
+                            var newBookmark = {
+                                "guid": guid, "latlng": latlng, "label": label,
                                 "id": bookmarkID, lat: ll.lat, lng: ll.lng //used for sort, will be deleted before adding to the bookmark plugin
                             };
                             newBookmarks.push(newBookmark);
@@ -654,79 +672,79 @@ function wrapper(plugin_info) {
 
     window.plugin.bookmarkUnderDraw.openOptDialog = function () {
         var html =
-		'<div>' +
-			'<table>';
+            '<div>' +
+            '<table>';
         html +=
-			'<tr>' +
-				'<td>' +
-					'Send alert even if portal name is not loaded' +
-				'</td>' +
-				'<td>' +
-					'<input id="bookmarkUnderDraw-bookmarkUnknownPortal" type="checkbox" ' +
-						(window.plugin.bookmarkUnderDraw.storage.bookmarkUnknownPortal ? 'checked="checked" ' : '') +
-						'/>' +
-                '</td>' +
-			'</tr>';
+            '<tr>' +
+            '<td>' +
+            'Send alert even if portal name is not loaded' +
+            '</td>' +
+            '<td>' +
+            '<input id="bookmarkUnderDraw-bookmarkUnknownPortal" type="checkbox" ' +
+            (window.plugin.bookmarkUnderDraw.storage.bookmarkUnknownPortal ? 'checked="checked" ' : '') +
+            '/>' +
+            '</td>' +
+            '</tr>';
         html +=
-			'<tr>' +
-				'<td>' +
-					'Send alert even if portal is hidden' +
-				'</td>' +
-				'<td>' +
-					'<input id="bookmarkUnderDraw-bookmarkHiddenPortal" type="checkbox" ' +
-						(window.plugin.bookmarkUnderDraw.storage.bookmarkHiddenPortal ? 'checked="checked" ' : '') +
-						'/>' +
-                '</td>' +
-			'</tr>';
+            '<tr>' +
+            '<td>' +
+            'Send alert even if portal is hidden' +
+            '</td>' +
+            '<td>' +
+            '<input id="bookmarkUnderDraw-bookmarkHiddenPortal" type="checkbox" ' +
+            (window.plugin.bookmarkUnderDraw.storage.bookmarkHiddenPortal ? 'checked="checked" ' : '') +
+            '/>' +
+            '</td>' +
+            '</tr>';
         html +=
-			'<tr>' +
-				'<td>' +
-                    'Folder :' +
-                '</td>' +
-				'<td>';
+            '<tr>' +
+            '<td>' +
+            'Folder :' +
+            '</td>' +
+            '<td>';
         html += '<select id="bookmarkUnderDraw-folderId">';
         //loop on bookmark folders
         for (folderId in window.plugin.bookmarks.bkmrksObj['portals']) {
             var folder = window.plugin.bookmarks.bkmrksObj['portals'][folderId];
             var folderName = folderId == window.plugin.bookmarks.KEY_OTHER_BKMRK ? 'Root' : folder.label;
             html += '<option value="' + folderId +
-                            '" ' + (window.plugin.bookmarkUnderDraw.storage.folderId == folderId ? 'selected="selected"' : '') +
-                            '>' + folderName + '</option>';
+                '" ' + (window.plugin.bookmarkUnderDraw.storage.folderId == folderId ? 'selected="selected"' : '') +
+                '>' + folderName + '</option>';
         }
         html += '</select>';
         html += '</td>' +
-			'</tr>';
+            '</tr>';
         html +=
-			'<tr>' +
-				'<td>' +
-                    'Sort :' +
-                '</td>' +
-				'<td>';
+            '<tr>' +
+            '<td>' +
+            'Sort :' +
+            '</td>' +
+            '<td>';
         html += '<select id="bookmarkUnderDraw-sortCode">';
         for (var i = 0; i < window.plugin.bookmarkUnderDraw.sortedSorts.length; i++) {
             var sort = window.plugin.bookmarkUnderDraw.sortedSorts[i];
             html += '<option value="' + sort.code +
-                            '" ' + (window.plugin.bookmarkUnderDraw.storage.sortCode == sort.code ? 'selected="selected"' : '') +
-                            '>' + sort.name + '</option>';
+                '" ' + (window.plugin.bookmarkUnderDraw.storage.sortCode == sort.code ? 'selected="selected"' : '') +
+                '>' + sort.name + '</option>';
         }
         html += '</select>';
         html += '</td>' +
-			'</tr>';
+            '</tr>';
         html +=
-			'<tr>' +
-				'<td>' +
-                    'Missing portal name :' +
-                '</td>' +
-				'<td>' +
-					'<input id="bookmarkUnderDraw-notLoadedPortalName" type="text" ' +
-                        'value="' + window.plugin.bookmarkUnderDraw.storage.notLoadedPortalName + '" />' +
-				'</td>' +
-			'</tr>';
+            '<tr>' +
+            '<td>' +
+            'Missing portal name :' +
+            '</td>' +
+            '<td>' +
+            '<input id="bookmarkUnderDraw-notLoadedPortalName" type="text" ' +
+            'value="' + window.plugin.bookmarkUnderDraw.storage.notLoadedPortalName + '" />' +
+            '</td>' +
+            '</tr>';
 
         html +=
-			'</table>' +
-		'</div>'
-        ;
+            '</table>' +
+            '</div>'
+            ;
         var d = dialog({
             html: html,
             id: 'bookmarkUnderDraw_opt',
@@ -766,7 +784,7 @@ function wrapper(plugin_info) {
                         window.plugin.bookmarkUnderDraw.saveOptAndBookmarkPortals();
                     }
                 }
-                ]
+            ]
         });
         var dialogId = d.data('id'); //dialog-bookmarkUnderDraw_opt
         $("#" + dialogId + "").parent().find(".ui-dialog-buttonpane .ui-button .ui-button-text:contains('OK')").parent().hide(); //remove the default OK button
