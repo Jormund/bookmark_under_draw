@@ -3,21 +3,17 @@
 // @name           IITC plugin: Bookmark portals under draw or search result.
 // @author         Jormund
 // @category       Controls
-// @version        0.2.0.20200121.1846
-// @description    [2020-01-21-1846] Bookmark portals under draw or search result.
+// @version        1.0.0.20221113.2221
+// @description    [2022-11-13-2221] Bookmark portals under draw or search result.
 // @updateURL      https://raw.githubusercontent.com/Jormund/bookmark_under_draw/master/bookmark_under_draw.meta.js
 // @downloadURL    https://raw.githubusercontent.com/Jormund/bookmark_under_draw/master/bookmark_under_draw.user.js
-// @include        https://ingress.com/intel*
-// @include        http://ingress.com/intel*
-// @include        https://*.ingress.com/intel*
-// @include        http://*.ingress.com/intel*
-// @include        https://intel.ingress.com/*
 // @match          https://intel.ingress.com/*
+// @match          https://intel-x.ingress.com/*
 // @match          https://*.ingress.com/intel*
-// @match          http://*.ingress.com/intel*
 // @grant          none
 // ==/UserScript==
 //Changelog
+//1.0.0: Activate on intel-x.ingress.com
 //0.2.0: Fix error with IITC-CE, MultiPolygon doesn't exist in Leaflet 1.4
 //0.1.15: activate on intel.ingress.com, changed download url to github
 //0.1.14: remove bookmarks under draw or search
